@@ -5,6 +5,7 @@ export interface StreamDelta {
 }
 
 export class DeepSeekService {
+  // Используем предоставленный пользователем URL
   private apiUrl = 'https://api.deepseek.com/v1/chat/completions';
 
   public async *sendMessageStream(message: string, history: any[], systemInstruction: string) {
@@ -18,21 +19,21 @@ export class DeepSeekService {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "deepseek-reasoner", // Model R1
+        model: "deepseek-reasoner", // Официальное ID для модели R1 с рассуждениями
         messages: [
           { role: "system", content: systemInstruction },
           ...history,
           { role: "user", content: message }
         ],
         stream: true,
-        temperature: 0.7,
-        max_tokens: 4096
+        // Температура для reasoner обычно фиксирована на стороне API, но передаем для надежности
+        temperature: 0.7 
       }),
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+      throw new Error(errorData.error?.message || `Ошибка DeepSeek API: ${response.status}`);
     }
 
     const reader = response.body?.getReader();
@@ -60,14 +61,16 @@ export class DeepSeekService {
           const data = JSON.parse(dataStr);
           const delta = data.choices[0].delta;
           
+          // Обработка блоков рассуждения (Thinking)
           if (delta.reasoning_content) {
             yield { type: 'reasoning', content: delta.reasoning_content } as StreamDelta;
           }
+          // Обработка финального контента
           if (delta.content) {
             yield { type: 'content', content: delta.content } as StreamDelta;
           }
         } catch (e) {
-          // Ignore parsing errors for partial chunks
+          // Игнорируем ошибки парсинга неполных чанков
         }
       }
     }

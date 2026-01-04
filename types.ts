@@ -1,9 +1,10 @@
 
-export type Role = 'user' | 'model';
+export type Role = 'user' | 'assistant';
 
 export interface Message {
   role: Role;
   text: string;
+  reasoning?: string; // For DeepSeek R1 thought process
   timestamp: number;
 }
 

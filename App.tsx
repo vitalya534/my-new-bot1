@@ -4,7 +4,7 @@ import { PERSONALITIES } from './constants';
 import { Message, Personality } from './types';
 import PersonalityCard from './components/PersonalityCard';
 import ChatMessage from './components/ChatMessage';
-import { geminiService } from './services/geminiService';
+import { deepseekService } from './services/deepseekService';
 
 declare global {
   interface AIStudio {
@@ -22,7 +22,6 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [userName, setUserName] = useState('Пользователь');
   const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'missing' | 'ready'>('checking');
   
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -32,11 +31,10 @@ const App: React.FC = () => {
       const tg = window.Telegram.WebApp;
       tg.ready();
       tg.expand();
-      if (tg.initDataUnsafe?.user?.first_name) {
-        setUserName(tg.initDataUnsafe.user.first_name);
-      }
+      tg.setHeaderColor('#0d1117');
     }
     
+    // Check key
     const checkKey = async () => {
       if (window.aistudio) {
         try {
@@ -55,13 +53,11 @@ const App: React.FC = () => {
   useEffect(() => {
     if (apiKeyStatus !== 'ready') return;
     
-    geminiService.initChat(currentPersonality.instruction);
-    const welcomeMsg: Message = {
-      role: 'model',
-      text: `Система Reasoning активна. Движок: Deep-Think (Gemini 3 Pro). Режим: ${currentPersonality.name}. Готов к глубокому анализу.`,
+    setMessages([{
+      role: 'assistant',
+      text: `DeepSeek-R1 подключен. Движок: DeepSeek-V3-Reasoner. Режим: ${currentPersonality.name}. Все системы функционируют.`,
       timestamp: Date.now()
-    };
-    setMessages([welcomeMsg]);
+    }]);
   }, [currentPersonality, apiKeyStatus]);
 
   useEffect(() => {
@@ -91,40 +87,48 @@ const App: React.FC = () => {
     setIsTyping(true);
 
     const history = messages.slice(1).map(m => ({
-      role: m.role,
+      role: m.role === 'assistant' ? 'model' : m.role,
       parts: [{ text: String(m.text) }]
     }));
 
     try {
-      const stream = geminiService.sendMessageStream(userMessage.text, history);
+      const stream = deepseekService.sendMessageStream(
+        userMessage.text, 
+        history, 
+        currentPersonality.instruction
+      );
+      
       let streamStarted = false;
-      let fullResponseText = '';
+      let fullText = '';
+      let fullReasoning = '';
 
       for await (const chunk of stream) {
         if (!streamStarted) {
           streamStarted = true;
-          setMessages(prev => [...prev, { role: 'model', text: '', timestamp: Date.now() }]);
+          setMessages(prev => [...prev, { role: 'assistant', text: '', reasoning: '', timestamp: Date.now() }]);
         }
         
-        fullResponseText += chunk;
+        if (chunk.type === 'reasoning') {
+          fullReasoning += chunk.content;
+        } else {
+          fullText += chunk.content;
+        }
+
         setMessages(prev => {
           const updated = [...prev];
           const last = updated[updated.length - 1];
-          if (last && last.role === 'model') {
-            last.text = fullResponseText;
+          if (last && last.role === 'assistant') {
+            last.text = fullText;
+            last.reasoning = fullReasoning;
           }
           return updated;
         });
       }
     } catch (error: any) {
-      const isAuthError = error.message === "AUTH_ERROR" || error.message === "MISSING_API_KEY";
-      if (isAuthError) setApiKeyStatus('missing');
-
+      console.error("DeepSeek API Error:", error);
       setMessages(prev => [...prev, {
-        role: 'model',
-        text: isAuthError 
-          ? "⚠️ Требуется обновление API-ключа для доступа к Reasoning Engine." 
-          : "⚠️ Критическая ошибка анализа. Повторите попытку.",
+        role: 'assistant',
+        text: `Error: ${error.message}. Убедитесь, что ваш API-ключ DeepSeek действителен.`,
         timestamp: Date.now()
       }]);
       setInputText(currentInput);
@@ -135,58 +139,53 @@ const App: React.FC = () => {
 
   if (apiKeyStatus === 'checking') {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-slate-900 gap-4">
-        <div className="w-12 h-12 border-4 border-slate-700 border-t-cyan-500 rounded-full animate-spin"></div>
-        <p className="text-slate-400 font-mono text-sm tracking-widest uppercase animate-pulse">Initializing Deep-Think...</p>
+      <div className="flex flex-col items-center justify-center h-screen bg-[#0d1117]">
+        <div className="w-12 h-12 border-2 border-slate-800 border-t-[#4D6BFE] rounded-full animate-spin"></div>
       </div>
     );
   }
 
   if (apiKeyStatus === 'missing') {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-slate-900 p-8 text-center animate-fade-in">
-        <div className="text-6xl mb-6 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]">💎</div>
-        <h2 className="text-2xl font-bold text-white mb-2">DeepSeek-Style Reasoning</h2>
-        <p className="text-slate-400 mb-8 max-w-xs font-light">
-          Для работы мощного интеллекта с глубоким размышлением требуется подключение API ключа.
-        </p>
+      <div className="flex flex-col items-center justify-center h-screen bg-[#0d1117] p-10 text-center animate-fade-in">
+        <div className="mb-8 space-y-4">
+          <div className="text-6xl">🌌</div>
+          <h2 className="text-2xl font-black text-white tracking-tight">DeepSeek API</h2>
+          <p className="text-slate-500 text-sm max-w-xs mx-auto">
+            Для работы приложения на "нормальном движке" необходимо предоставить ваш персональный API-ключ DeepSeek.
+          </p>
+        </div>
         <button 
           onClick={handleSetupKey}
-          className="w-full max-w-xs bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-cyan-900/40 active:scale-95 transition-all"
+          className="w-full max-w-xs bg-[#4D6BFE] hover:bg-[#3b57e6] text-white font-black py-4 rounded-2xl shadow-xl transition-all active:scale-95"
         >
-          АКТИВИРОВАТЬ ДВИЖОК
+          ВВЕСТИ API КЛЮЧ
         </button>
-        <a 
-          href="https://ai.google.dev/gemini-api/docs/billing" 
-          target="_blank" 
-          className="mt-6 text-xs text-slate-500 hover:text-cyan-400 underline transition-colors"
-        >
-          Инструкция по биллингу (Google AI Studio)
-        </a>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen w-full bg-slate-950 relative overflow-hidden animate-fade-in font-sans">
-      <header className="px-5 py-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 z-30 shrink-0 flex items-center justify-between">
+    <div className="flex flex-col h-screen w-full bg-[#0d1117] text-slate-200">
+      {/* Header */}
+      <header className="px-5 py-4 bg-[#161b22]/95 backdrop-blur-xl border-b border-[#30363d] z-30 shrink-0 flex items-center justify-between shadow-2xl">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-cyan-500 flex items-center justify-center shadow-[0_0_10px_rgba(6,182,212,0.4)]">
-             <span className="text-white text-xs font-black">DS</span>
+          <div className="w-10 h-10 rounded-xl bg-[#4D6BFE] flex items-center justify-center shadow-lg">
+             <span className="text-white text-lg font-black italic">D</span>
           </div>
           <div>
-            <h1 className="text-sm font-bold text-white leading-tight uppercase tracking-wider">
-              Reasoning <span className="text-cyan-400">Engine</span>
+            <h1 className="text-sm font-black text-white uppercase tracking-wider">
+              DeepSeek <span className="text-[#4D6BFE]">R1</span>
             </h1>
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_5px_rgba(34,197,94,0.6)]"></span>
-              <span className="text-[9px] text-slate-400 uppercase font-black">Connected to DeepThink R1</span>
+              <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Live Engine</span>
             </div>
           </div>
         </div>
         <button 
           onClick={() => setApiKeyStatus('missing')}
-          className="p-2 text-slate-500 hover:text-cyan-400 transition-colors bg-slate-800 rounded-lg"
+          className="p-2.5 text-slate-500 hover:text-white transition-colors bg-[#21262d] rounded-xl border border-[#30363d]"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
@@ -195,31 +194,41 @@ const App: React.FC = () => {
         </button>
       </header>
 
-      <div className="px-4 py-4 personality-grid bg-slate-950/50 backdrop-blur-sm z-20 border-b border-slate-900 shrink-0">
+      {/* Personality Selector */}
+      <div className="px-4 py-3 grid grid-cols-4 gap-2 bg-[#0d1117] border-b border-[#30363d] shrink-0">
         {PERSONALITIES.map(p => (
-          <PersonalityCard 
-            key={p.id} 
-            personality={p} 
-            isActive={currentPersonality.id === p.id}
+          <button
+            key={p.id}
             onClick={() => setCurrentPersonality(p)}
-          />
+            className={`flex flex-col items-center p-2 rounded-xl transition-all border ${
+              currentPersonality.id === p.id 
+                ? 'bg-[#161b22] border-[#4D6BFE] shadow-lg shadow-blue-900/10' 
+                : 'bg-transparent border-transparent grayscale opacity-30 hover:opacity-100 hover:grayscale-0'
+            }`}
+          >
+            <span className="text-xl mb-1">{p.emoji}</span>
+            <span className="text-[7px] font-black uppercase tracking-tighter truncate w-full text-center text-slate-400">
+              {p.name.split(' ')[1] || p.name}
+            </span>
+          </button>
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 hide-scrollbar bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.05),transparent)]">
+      {/* Chat Area */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 hide-scrollbar">
         {messages.map((msg, i) => <ChatMessage key={`${msg.timestamp}-${i}`} message={msg} />)}
         
         {isTyping && (!messages[messages.length-1]?.text) && (
           <div className="flex justify-start mb-6 animate-fade-in">
-            <div className="bg-slate-900 px-5 py-4 rounded-2xl rounded-tl-none border border-slate-800 shadow-xl flex flex-col gap-2 min-w-[200px]">
-              <div className="flex items-center gap-2">
-                 <div className="w-2 h-2 bg-cyan-500 rounded-full animate-ping"></div>
-                 <div className="text-[10px] text-cyan-400 font-black uppercase tracking-widest">Chain-of-thought analysis...</div>
+            <div className="bg-[#161b22] px-5 py-4 rounded-2xl rounded-tl-none border border-[#30363d] shadow-xl flex flex-col gap-3 min-w-[240px]">
+              <div className="flex items-center gap-3">
+                 <div className="w-2 h-2 bg-[#4D6BFE] rounded-full animate-pulse"></div>
+                 <div className="text-[10px] text-[#4D6BFE] font-black uppercase tracking-widest">
+                   System Thinking...
+                 </div>
               </div>
-              <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 bg-slate-700 rounded-full animate-bounce"></div>
-                <div className="w-1.5 h-1.5 bg-slate-700 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                <div className="w-1.5 h-1.5 bg-slate-700 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+              <div className="h-1 w-full bg-[#30363d] rounded-full overflow-hidden">
+                <div className="h-full bg-[#4D6BFE] w-1/3 animate-loading"></div>
               </div>
             </div>
           </div>
@@ -228,12 +237,13 @@ const App: React.FC = () => {
         <div ref={chatEndRef} />
       </div>
 
-      <footer className="p-4 bg-slate-900 border-t border-slate-800 z-30 shrink-0 pb-safe">
+      {/* Input */}
+      <footer className="p-4 bg-[#161b22] border-t border-[#30363d] shrink-0 pb-safe">
         <form onSubmit={handleSendMessage} className="flex gap-3">
           <input 
             type="text"
-            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-5 py-4 text-sm font-medium text-white placeholder-slate-600 shadow-inner focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all outline-none"
-            placeholder="Введите запрос для глубокого анализа..."
+            className="flex-1 bg-[#0d1117] border border-[#30363d] rounded-xl px-5 py-4 text-sm font-medium text-white placeholder-slate-600 focus:border-[#4D6BFE] transition-all outline-none"
+            placeholder="Запрос к DeepSeek R1..."
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             disabled={isTyping}
@@ -243,8 +253,8 @@ const App: React.FC = () => {
             disabled={!inputText.trim() || isTyping}
             className={`p-4 rounded-xl transition-all active:scale-90 flex items-center justify-center ${
               !inputText.trim() || isTyping 
-                ? 'bg-slate-800 text-slate-600' 
-                : 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/20 hover:bg-cyan-500'
+                ? 'bg-[#21262d] text-slate-600' 
+                : 'bg-[#4D6BFE] text-white shadow-lg shadow-blue-900/20 hover:bg-[#3b57e6]'
             }`}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
@@ -253,6 +263,16 @@ const App: React.FC = () => {
           </button>
         </form>
       </footer>
+
+      <style>{`
+        @keyframes loading {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(300%); }
+        }
+        .animate-loading {
+          animation: loading 1.5s infinite ease-in-out;
+        }
+      `}</style>
     </div>
   );
 };

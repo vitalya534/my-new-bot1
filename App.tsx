@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PERSONALITIES } from './constants';
 import { Message, Personality } from './types';
 import ChatMessage from './components/ChatMessage';
-import { deepseekService } from './services/deepseekService';
+import { geminiService } from './services/geminiService';
 
 declare global {
   interface Window {
@@ -16,7 +16,6 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'ready'>('checking');
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -28,18 +27,15 @@ const App: React.FC = () => {
       tg.setHeaderColor('#0d1117');
       tg.setBackgroundColor('#0d1117');
     }
-    setApiKeyStatus('ready');
   }, []);
 
   useEffect(() => {
-    if (apiKeyStatus !== 'ready') return;
-    
     setMessages([{
       role: 'assistant',
-      text: `Движок DeepSeek-R1 инициализирован. Используется провайдер: api.deepseek.com. Режим: ${currentPersonality.name}. Чем я могу помочь?`,
+      text: `Система Gemini 3 Reasoning инициализирована. Режим: ${currentPersonality.name}. Я готов к глубокому анализу ваших задач.`,
       timestamp: Date.now()
     }]);
-  }, [currentPersonality, apiKeyStatus]);
+  }, [currentPersonality]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -60,7 +56,6 @@ const App: React.FC = () => {
     setInputText('');
     setIsTyping(true);
 
-    // Маппинг истории для API
     const history = messages
       .filter(m => m.timestamp > 0)
       .slice(-10) 
@@ -70,7 +65,7 @@ const App: React.FC = () => {
       }));
 
     try {
-      const stream = deepseekService.sendMessageStream(
+      const stream = geminiService.sendMessageStream(
         userMessage.text, 
         history, 
         currentPersonality.instruction
@@ -108,10 +103,10 @@ const App: React.FC = () => {
         });
       }
     } catch (error: any) {
-      console.error("DeepSeek Error:", error);
+      console.error("Gemini Error:", error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        text: `Ошибка API: ${error.message}. Проверьте соединение или баланс DeepSeek.`,
+        text: `Ошибка: ${error.message}. Убедитесь, что API ключ корректен для Google Gemini.`,
         timestamp: Date.now()
       }]);
       setInputText(currentInput);
@@ -124,16 +119,16 @@ const App: React.FC = () => {
     <div className="flex flex-col h-screen w-full bg-[#0d1117] text-slate-200 font-sans">
       <header className="px-5 py-4 bg-[#161b22]/90 backdrop-blur-xl border-b border-[#30363d] flex items-center justify-between z-50">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#4D6BFE] flex items-center justify-center shadow-[0_0_15px_rgba(77,107,254,0.4)]">
-             <span className="text-white text-lg font-black italic">D</span>
+          <div className="w-9 h-9 rounded-xl bg-cyan-600 flex items-center justify-center shadow-[0_0_15px_rgba(8,145,178,0.4)]">
+             <span className="text-white text-lg font-black italic">G</span>
           </div>
           <div>
             <h1 className="text-xs font-black uppercase tracking-[0.2em] text-white">
-              DeepSeek <span className="text-[#4D6BFE]">R1</span>
+              Gemini <span className="text-cyan-400">Advanced</span>
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-1 h-1 bg-green-500 rounded-full animate-pulse"></span>
-              <span className="text-[9px] font-bold text-slate-500 uppercase">Neural Engine Active</span>
+              <span className="w-1 h-1 bg-cyan-500 rounded-full animate-pulse"></span>
+              <span className="text-[9px] font-bold text-slate-500 uppercase">Reasoning Active</span>
             </div>
           </div>
         </div>
@@ -146,7 +141,7 @@ const App: React.FC = () => {
             onClick={() => setCurrentPersonality(p)}
             className={`flex-shrink-0 px-4 py-2 rounded-xl transition-all border text-[10px] font-black uppercase tracking-widest ${
               currentPersonality.id === p.id 
-                ? 'bg-[#4D6BFE] border-transparent text-white shadow-lg' 
+                ? 'bg-cyan-600 border-transparent text-white shadow-lg' 
                 : 'bg-[#161b22] border-[#30363d] text-slate-500 hover:text-slate-300'
             }`}
           >
@@ -161,11 +156,11 @@ const App: React.FC = () => {
         {isTyping && !messages[messages.length-1]?.text && !messages[messages.length-1]?.reasoning && (
           <div className="flex items-center gap-3 p-4 bg-[#161b22] rounded-2xl border border-[#30363d] w-fit animate-pulse">
             <div className="flex gap-1">
-              <div className="w-1.5 h-1.5 bg-[#4D6BFE] rounded-full animate-bounce"></div>
-              <div className="w-1.5 h-1.5 bg-[#4D6BFE] rounded-full animate-bounce [animation-delay:0.2s]"></div>
-              <div className="w-1.5 h-1.5 bg-[#4D6BFE] rounded-full animate-bounce [animation-delay:0.4s]"></div>
+              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce"></div>
+              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce [animation-delay:0.4s]"></div>
             </div>
-            <span className="text-[10px] font-black text-[#4D6BFE] uppercase tracking-[0.2em]">DeepThinker R1</span>
+            <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.2em]">Thinking...</span>
           </div>
         )}
         <div ref={chatEndRef} />
@@ -175,8 +170,8 @@ const App: React.FC = () => {
         <form onSubmit={handleSendMessage} className="flex gap-2 max-w-4xl mx-auto">
           <input 
             type="text"
-            className="flex-1 bg-[#0d1117] border border-[#30363d] rounded-2xl px-5 py-4 text-sm text-white placeholder-slate-600 focus:border-[#4D6BFE] transition-all outline-none"
-            placeholder="Задайте вопрос R1..."
+            className="flex-1 bg-[#0d1117] border border-[#30363d] rounded-2xl px-5 py-4 text-sm text-white placeholder-slate-600 focus:border-cyan-500 transition-all outline-none"
+            placeholder="Спросите о чем угодно..."
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             disabled={isTyping}
@@ -184,7 +179,7 @@ const App: React.FC = () => {
           <button 
             type="submit"
             disabled={!inputText.trim() || isTyping}
-            className="w-14 h-14 rounded-2xl bg-[#4D6BFE] text-white flex items-center justify-center disabled:opacity-20 disabled:grayscale transition-all active:scale-90 shadow-xl shadow-blue-900/20"
+            className="w-14 h-14 rounded-2xl bg-cyan-600 text-white flex items-center justify-center disabled:opacity-20 transition-all active:scale-90 shadow-xl"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>

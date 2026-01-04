@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PERSONALITIES } from './constants';
 import { Message, Personality } from './types';
 import PersonalityCard from './components/PersonalityCard';
@@ -18,11 +18,17 @@ const App: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [userName, setUserName] = useState('Друг');
+  const [hasApiKey, setHasApiKey] = useState(true);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Initialize Telegram
   useEffect(() => {
+    // Check for API key availability
+    if (!process.env.API_KEY) {
+      console.warn("Warning: API_KEY is missing from environment.");
+      setHasApiKey(false);
+    }
+
     if (window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
       tg.ready();
@@ -33,19 +39,20 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Initialize Chat Session on personality change
   useEffect(() => {
-    geminiService.initChat(currentPersonality.instruction);
-    // Optional: add a welcome message from the AI in its new persona
-    const welcomeMsg: Message = {
-      role: 'model',
-      text: `Привет, ${userName}! Теперь я в режиме "${currentPersonality.name}". О чем поболтаем?`,
-      timestamp: Date.now()
-    };
-    setMessages([welcomeMsg]);
+    try {
+      geminiService.initChat(currentPersonality.instruction);
+      const welcomeMsg: Message = {
+        role: 'model',
+        text: `Привет, ${userName}! Теперь я в режиме "${currentPersonality.name}". О чем поболтаем?`,
+        timestamp: Date.now()
+      };
+      setMessages([welcomeMsg]);
+    } catch (e) {
+      console.error("Chat init failed", e);
+    }
   }, [currentPersonality, userName]);
 
-  // Scroll to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -105,18 +112,27 @@ const App: React.FC = () => {
     setCurrentPersonality(personality);
   };
 
+  if (!hasApiKey) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen p-6 text-center bg-white text-slate-900">
+        <div className="text-6xl mb-4">🔑</div>
+        <h2 className="text-xl font-bold mb-2">API Ключ не найден</h2>
+        <p className="text-slate-500 text-sm mb-6">Пожалуйста, убедитесь, что API_KEY настроен в переменных окружения вашего проекта.</p>
+        <button onClick={() => window.location.reload()} className="bg-slate-900 text-white px-6 py-2 rounded-full font-medium">Попробовать снова</button>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-screen max-w-2xl mx-auto overflow-hidden bg-slate-50">
-      {/* Header */}
-      <header className="px-6 py-4 glass z-20 border-b border-slate-200">
+    <div className="flex flex-col h-screen max-w-2xl mx-auto overflow-hidden bg-slate-50 relative">
+      <header className="px-6 py-4 glass z-20 border-b border-slate-200 shrink-0">
         <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">
           Привет, <span className="text-indigo-600">{userName}</span>!
         </h1>
         <p className="text-xs text-slate-500 font-medium">Выбери мой стиль общения:</p>
       </header>
 
-      {/* Personality Selector */}
-      <div className="p-4 grid grid-cols-2 gap-3 z-10">
+      <div className="p-4 grid grid-cols-2 gap-3 z-10 shrink-0 bg-slate-50/80 backdrop-blur-sm">
         {PERSONALITIES.map(p => (
           <PersonalityCard 
             key={p.id} 
@@ -127,8 +143,7 @@ const App: React.FC = () => {
         ))}
       </div>
 
-      {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 hide-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 py-6 hide-scrollbar bg-slate-50">
         {messages.map((msg, idx) => (
           <ChatMessage key={idx} message={msg} />
         ))}
@@ -146,14 +161,13 @@ const App: React.FC = () => {
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 glass border-t border-slate-200 sticky bottom-0">
+      <div className="p-4 glass border-t border-slate-200 sticky bottom-0 shrink-0">
         <form onSubmit={handleSendMessage} className="flex items-center gap-2">
           <input 
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder={`Спроси что-нибудь у ${currentPersonality.name.toLowerCase()}а...`}
+            placeholder={`Спроси у ${currentPersonality.name.toLowerCase()}а...`}
             className="flex-1 bg-slate-100 border-none rounded-full px-5 py-3 text-sm focus:ring-2 focus:ring-slate-900 outline-none transition-all"
             disabled={isTyping}
           />

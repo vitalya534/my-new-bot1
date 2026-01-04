@@ -18,17 +18,10 @@ const App: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [userName, setUserName] = useState('Друг');
-  const [hasApiKey, setHasApiKey] = useState(true);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Check for API key availability
-    if (!process.env.API_KEY) {
-      console.warn("Warning: API_KEY is missing from environment.");
-      setHasApiKey(false);
-    }
-
     if (window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
       tg.ready();
@@ -97,7 +90,7 @@ const App: React.FC = () => {
       console.error("Failed to send message:", error);
       setMessages(prev => [...prev, {
         role: 'model',
-        text: "Ой, что-то пошло не так. Попробуй еще раз!",
+        text: "Ой, что-то пошло не так. Похоже, возникли проблемы с подключением или ключом доступа. Попробуй еще раз позже!",
         timestamp: Date.now()
       }]);
     } finally {
@@ -111,17 +104,6 @@ const App: React.FC = () => {
     }
     setCurrentPersonality(personality);
   };
-
-  if (!hasApiKey) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen p-6 text-center bg-white text-slate-900">
-        <div className="text-6xl mb-4">🔑</div>
-        <h2 className="text-xl font-bold mb-2">API Ключ не найден</h2>
-        <p className="text-slate-500 text-sm mb-6">Пожалуйста, убедитесь, что API_KEY настроен в переменных окружения вашего проекта.</p>
-        <button onClick={() => window.location.reload()} className="bg-slate-900 text-white px-6 py-2 rounded-full font-medium">Попробовать снова</button>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-screen max-w-2xl mx-auto overflow-hidden bg-slate-50 relative">

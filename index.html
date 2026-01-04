@@ -6,9 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Persona Assistant</title>
     
-    <!-- Initialize process.env immediately to prevent ReferenceErrors -->
+    <!-- Initialize process.env safely -->
     <script>
-        window.process = window.process || { env: { API_KEY: "" } };
+        window.process = window.process || {};
+        window.process.env = window.process.env || {};
+        
         window.addEventListener('error', function(event) {
             const display = document.getElementById('error-display');
             if (display) {

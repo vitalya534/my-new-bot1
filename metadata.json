@@ -1,7 +1,5 @@
 {
-  "name": "Gemini Multi-Persona Assistant",
-  "description": "A high-performance React application featuring a dynamic AI assistant with switchable personalities including Friend, Expert, Joker, and Psychologist, powered by Gemini 3 Flash.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
+  "name": "DeepSeek R1 Advanced Assistant",
+  "description": "A professional AI assistant powered by DeepSeek R1 Reasoning model with real-time thought process visualization.",
+  "requestFramePermissions": []
 }

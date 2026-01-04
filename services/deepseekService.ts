@@ -1,4 +1,9 @@
 
+export interface StreamDelta {
+  type: 'reasoning' | 'content';
+  content: string;
+}
+
 export class DeepSeekService {
   private apiUrl = 'https://api.deepseek.com/v1/chat/completions';
 
@@ -13,16 +18,14 @@ export class DeepSeekService {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "deepseek-reasoner",
+        model: "deepseek-reasoner", // Model R1
         messages: [
           { role: "system", content: systemInstruction },
-          ...history.map(h => ({
-            role: h.role === 'model' ? 'assistant' : h.role,
-            content: h.parts[0].text
-          })),
+          ...history,
           { role: "user", content: message }
         ],
         stream: true,
+        temperature: 0.7,
         max_tokens: 4096
       }),
     });
@@ -37,32 +40,34 @@ export class DeepSeekService {
     
     if (!reader) return;
 
+    let buffer = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n').filter(line => line.trim() !== '');
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const dataStr = line.replace('data: ', '');
-          if (dataStr === '[DONE]') return;
+        const cleanedLine = line.trim();
+        if (!cleanedLine || !cleanedLine.startsWith('data: ')) continue;
+        
+        const dataStr = cleanedLine.replace('data: ', '');
+        if (dataStr === '[DONE]') return;
+        
+        try {
+          const data = JSON.parse(dataStr);
+          const delta = data.choices[0].delta;
           
-          try {
-            const data = JSON.parse(dataStr);
-            const delta = data.choices[0].delta;
-            
-            // DeepSeek R1 specific fields
-            if (delta.reasoning_content) {
-              yield { type: 'reasoning', content: delta.reasoning_content };
-            }
-            if (delta.content) {
-              yield { type: 'content', content: delta.content };
-            }
-          } catch (e) {
-            console.error("Error parsing stream chunk", e);
+          if (delta.reasoning_content) {
+            yield { type: 'reasoning', content: delta.reasoning_content } as StreamDelta;
           }
+          if (delta.content) {
+            yield { type: 'content', content: delta.content } as StreamDelta;
+          }
+        } catch (e) {
+          // Ignore parsing errors for partial chunks
         }
       }
     }

@@ -8,10 +8,16 @@ export class DeepSeekService {
   private apiUrl = 'https://api.deepseek.com/v1/chat/completions';
 
   public async *sendMessageStream(message: string, history: any[], systemInstruction: string) {
-    const apiKey = (process.env.API_KEY || (window as any).process?.env?.API_KEY)?.trim();
+    // Robust key retrieval looking into standard process.env, window.process, and import.meta.env
+    const apiKey = (
+      (typeof process !== 'undefined' && process.env?.API_KEY) || 
+      (window as any).process?.env?.API_KEY || 
+      (import.meta as any).env?.VITE_API_KEY ||
+      (import.meta as any).env?.API_KEY
+    )?.trim();
     
     if (!apiKey) {
-      throw new Error("API_KEY не найден в переменных окружения.");
+      throw new Error("API_KEY не обнаружен. Проверьте настройки окружения в Vercel.");
     }
 
     const response = await fetch(this.apiUrl, {
@@ -36,10 +42,15 @@ export class DeepSeekService {
       let errorMessage = `HTTP ${response.status}`;
       try {
         const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error?.message || errorMessage;
-      } catch (e) {
-        errorMessage = errorText || errorMessage;
+        if (errorJson.error?.message) {
+          errorMessage = errorJson.error.message;
+        }
+      } catch (e) {}
+      
+      if (response.status === 401) {
+        throw new Error("Ошибка авторизации: Ключ API недействителен для DeepSeek. Убедитесь, что вы используете ключ от api.deepseek.com, а не от Google.");
       }
+      
       throw new Error(`DeepSeek API Error: ${errorMessage}`);
     }
 

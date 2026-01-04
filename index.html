@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Persona Assistant</title>
     
-    <!-- Initialize process.env safely -->
     <script>
+        // Ensure process.env is available globally without overwriting existing values
         window.process = window.process || {};
         window.process.env = window.process.env || {};
         
@@ -15,9 +15,8 @@
             const display = document.getElementById('error-display');
             if (display) {
                 display.style.display = 'block';
-                display.innerHTML += `<div class="p-2 border-b border-red-200 text-red-700 font-mono text-xs">
-                    <strong>Error:</strong> ${event.message}<br/>
-                    <small class="opacity-70">${event.filename}:${event.lineno}</small>
+                display.innerHTML += `<div class="p-2 border-b border-red-200 text-red-700 font-mono text-[10px]">
+                    <strong>Runtime Error:</strong> ${event.message}
                 </div>`;
             }
         });
@@ -51,11 +50,10 @@
             background: #fff1f2;
             color: #9f1239;
             z-index: 10000;
-            padding: 1rem;
-            max-height: 40vh;
+            padding: 0.5rem;
+            max-height: 30vh;
             overflow-y: auto;
             border-bottom: 2px solid #fda4af;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }
     </style>
 
@@ -72,17 +70,16 @@
     }
     </script>
 </head>
-<body class="text-slate-900 transition-colors duration-300">
-    <div id="error-display"><strong>Critical Script Error:</strong><br/></div>
+<body class="text-slate-900">
+    <div id="error-display"></div>
     
     <div id="root">
         <div class="flex items-center justify-center h-screen flex-col gap-4">
             <div class="w-10 h-10 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-            <p class="text-slate-500 font-medium animate-pulse text-sm">Инициализация интерфейса...</p>
+            <p class="text-slate-500 font-medium animate-pulse text-sm">Запуск системы...</p>
         </div>
     </div>
 
-    <!-- index.tsx is imported as a module -->
     <script type="module" src="./index.tsx"></script>
 </body>
 </html>

@@ -33,17 +33,13 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    try {
-      geminiService.initChat(currentPersonality.instruction);
-      const welcomeMsg: Message = {
-        role: 'model',
-        text: `Привет, ${userName}! Теперь я в режиме "${currentPersonality.name}". О чем поболтаем?`,
-        timestamp: Date.now()
-      };
-      setMessages([welcomeMsg]);
-    } catch (e) {
-      console.error("Chat init failed", e);
-    }
+    geminiService.initChat(currentPersonality.instruction);
+    const welcomeMsg: Message = {
+      role: 'model',
+      text: `Привет, ${userName}! Теперь я в режиме "${currentPersonality.name}". О чем поболтаем?`,
+      timestamp: Date.now()
+    };
+    setMessages([welcomeMsg]);
   }, [currentPersonality, userName]);
 
   useEffect(() => {
@@ -61,38 +57,61 @@ const App: React.FC = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const originalInput = inputText;
     setInputText('');
     setIsTyping(true);
 
+    let streamStarted = false;
+
     try {
-      let fullResponseText = '';
-      const modelMessage: Message = {
-        role: 'model',
-        text: '',
-        timestamp: Date.now()
-      };
-
-      setMessages(prev => [...prev, modelMessage]);
-
       const stream = geminiService.sendMessageStream(userMessage.text);
-      
+      let fullResponseText = '';
+
       for await (const chunk of stream) {
-        if (chunk) {
-          fullResponseText += chunk;
-          setMessages(prev => {
-            const newHistory = [...prev];
-            newHistory[newHistory.length - 1].text = fullResponseText;
-            return newHistory;
-          });
+        if (!streamStarted) {
+          streamStarted = true;
+          // Add the model message placeholder only when we actually get data
+          setMessages(prev => [...prev, {
+            role: 'model',
+            text: '',
+            timestamp: Date.now()
+          }]);
         }
+
+        fullResponseText += chunk;
+        setMessages(prev => {
+          const newHistory = [...prev];
+          const lastMsg = newHistory[newHistory.length - 1];
+          if (lastMsg && lastMsg.role === 'model') {
+            lastMsg.text = fullResponseText;
+          }
+          return newHistory;
+        });
       }
-    } catch (error) {
-      console.error("Failed to send message:", error);
+    } catch (error: any) {
+      console.error("Chat error:", error);
+      
+      // Remove placeholder if it was added but empty
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last && last.role === 'model' && last.text === '') {
+          return prev.slice(0, -1);
+        }
+        return prev;
+      });
+
+      const errorMessage = error.message?.includes('403') || error.message?.includes('API_KEY') 
+        ? "Ошибка доступа: проверьте API-ключ."
+        : `Ошибка: ${error.message || "не удалось получить ответ"}`;
+
       setMessages(prev => [...prev, {
         role: 'model',
-        text: "Ой, что-то пошло не так. Похоже, возникли проблемы с подключением или ключом доступа. Попробуй еще раз позже!",
+        text: `⚠️ ${errorMessage}`,
         timestamp: Date.now()
       }]);
+      
+      // Restore input text so user doesn't lose it
+      setInputText(originalInput);
     } finally {
       setIsTyping(false);
     }
@@ -111,7 +130,6 @@ const App: React.FC = () => {
         <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">
           Привет, <span className="text-indigo-600">{userName}</span>!
         </h1>
-        <p className="text-xs text-slate-500 font-medium">Выбери мой стиль общения:</p>
       </header>
 
       <div className="p-4 grid grid-cols-2 gap-3 z-10 shrink-0 bg-slate-50/80 backdrop-blur-sm">
@@ -129,16 +147,16 @@ const App: React.FC = () => {
         {messages.map((msg, idx) => (
           <ChatMessage key={idx} message={msg} />
         ))}
-        {isTyping && (
-          <div className="flex justify-start mb-4">
-            <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
-              <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce"></div>
-                <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-              </div>
-            </div>
-          </div>
+        {isTyping && !messages[messages.length-1]?.text && messages[messages.length-1]?.role === 'model' && (
+           <div className="flex justify-start mb-4">
+             <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
+               <div className="flex gap-1">
+                 <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce"></div>
+                 <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                 <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+               </div>
+             </div>
+           </div>
         )}
         <div ref={chatEndRef} />
       </div>
@@ -149,8 +167,8 @@ const App: React.FC = () => {
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder={`Спроси у ${currentPersonality.name.toLowerCase()}а...`}
-            className="flex-1 bg-slate-100 border-none rounded-full px-5 py-3 text-sm focus:ring-2 focus:ring-slate-900 outline-none transition-all"
+            placeholder={`Напиши ${currentPersonality.name.toLowerCase()}у...`}
+            className="flex-1 bg-slate-100 border-none rounded-full px-5 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
             disabled={isTyping}
           />
           <button 
@@ -159,7 +177,7 @@ const App: React.FC = () => {
             className={`p-3 rounded-full transition-all flex items-center justify-center ${
               !inputText.trim() || isTyping 
               ? 'bg-slate-200 text-slate-400' 
-              : 'bg-slate-900 text-white hover:scale-105 active:scale-95'
+              : 'bg-indigo-600 text-white hover:scale-105 active:scale-95 shadow-md shadow-indigo-200'
             }`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

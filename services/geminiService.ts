@@ -1,44 +1,47 @@
 
 import { GoogleGenAI, GenerateContentResponse, Chat } from "@google/genai";
-import { Message } from "../types";
 
 const MODEL_NAME = 'gemini-3-flash-preview';
 
 export class GeminiService {
-  private ai: GoogleGenAI | null = null;
   private chat: Chat | null = null;
+  private currentInstruction: string = "";
 
-  private getAI() {
-    // Re-instantiate or ensure AI exists with current environment key
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      console.error("API_KEY is missing from process.env");
-    }
-    return new GoogleGenAI({ apiKey: apiKey || '' });
+  public initChat(systemInstruction: string) {
+    this.currentInstruction = systemInstruction;
+    this.chat = null; // Reset chat to force re-initialization with new instruction
   }
 
-  public initChat(systemInstruction: string, history: Message[] = []) {
-    const ai = this.getAI();
+  private ensureChat() {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      throw new Error("API_KEY is not configured in the environment.");
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     this.chat = ai.chats.create({
       model: MODEL_NAME,
       config: {
-        systemInstruction,
-        temperature: 0.8,
-        topP: 0.95,
+        systemInstruction: this.currentInstruction,
+        temperature: 0.7,
       },
     });
+    return this.chat;
   }
 
   public async *sendMessageStream(message: string) {
-    if (!this.chat) {
-      throw new Error("Chat not initialized. Call initChat first.");
-    }
-
-    const result = await this.chat.sendMessageStream({ message });
-    
-    for await (const chunk of result) {
-      const response = chunk as GenerateContentResponse;
-      yield response.text;
+    try {
+      const chat = this.chat || this.ensureChat();
+      const result = await chat.sendMessageStream({ message });
+      
+      for await (const chunk of result) {
+        const response = chunk as GenerateContentResponse;
+        const text = response.text;
+        if (text) yield text;
+      }
+    } catch (error: any) {
+      console.error("Gemini stream error:", error);
+      throw error;
     }
   }
 }

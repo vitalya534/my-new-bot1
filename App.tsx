@@ -3,84 +3,46 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PERSONALITIES } from './constants';
 import { Message, Personality } from './types';
 import ChatMessage from './components/ChatMessage';
-import { deepseekService } from './services/deepseekService';
 import { geminiService } from './services/geminiService';
+import { deepseekService } from './services/deepseekService';
 
 declare global {
   interface Window {
     Telegram?: any;
-    process?: any;
   }
 }
 
-type EngineType = 'deepseek' | 'gemini';
+type EngineType = 'gemini' | 'deepseek';
 
 const App: React.FC = () => {
+  // Устанавливаем Gemini как основной движок по умолчанию
+  const [engine, setEngine] = useState<EngineType>('gemini');
   const [currentPersonality, setCurrentPersonality] = useState<Personality>(PERSONALITIES[0]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [engine, setEngine] = useState<EngineType>('deepseek');
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [botAuth, setBotAuth] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const getEnvVar = (name: string): string | undefined => {
-    const p = (typeof process !== 'undefined' ? process : { env: {} }) as any;
-    const w = (window as any).process?.env || {};
-    
-    if (name === 'DEEPSEEK_API_KEY') {
-      return (p.env?.DEEPSEEK_API_KEY || w.DEEPSEEK_API_KEY || p.env?.NEXT_PUBLIC_DEEPSEEK_API_KEY || p.env?.VITE_DEEPSEEK_API_KEY)?.trim();
-    }
-    if (name === 'API_KEY') {
-      return (p.env?.API_KEY || w.API_KEY || p.env?.NEXT_PUBLIC_API_KEY || p.env?.VITE_API_KEY)?.trim();
-    }
-    if (name === 'BOT_TOKEN') {
-      return (p.env?.BOT_TOKEN || w.BOT_TOKEN || p.env?.NEXT_PUBLIC_BOT_TOKEN || p.env?.VITE_BOT_TOKEN)?.trim();
-    }
-    return undefined;
-  };
-
   useEffect(() => {
-    const dsKey = getEnvVar('DEEPSEEK_API_KEY');
-    const gKey = getEnvVar('API_KEY');
-    const botToken = getEnvVar('BOT_TOKEN');
-
-    if (botToken) {
-      setBotAuth(true);
-    }
-
-    // Автоматический выбор движка
-    if (gKey?.startsWith('AIza') && !dsKey) {
-      setEngine('gemini');
-    } else {
-      setEngine('deepseek');
-    }
-
     if (window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
       tg.ready();
       tg.expand();
       tg.setHeaderColor('#0d1117');
     }
-    
-    console.debug("[App] Engine check:", { 
-      hasDeepSeek: !!dsKey, 
-      hasGemini: !!gKey, 
-      hasBotToken: !!botToken,
-      engine 
-    });
   }, []);
 
+  // Инициализация чата при смене режима или движка
   useEffect(() => {
-    const engineName = engine === 'deepseek' ? 'DeepSeek V3' : 'Gemini 3 Pro';
+    const engineName = engine === 'gemini' ? 'Gemini 3 Pro' : 'DeepSeek V3';
     setMessages([{
       role: 'assistant',
-      text: `Система готова. Движок: ${engineName}. Режим: ${currentPersonality.name}.`,
+      text: `Привет! Я твой продвинутый ассистент. Сейчас я использую движок **${engineName}** в режиме **${currentPersonality.name}**. Чем могу помочь?`,
       timestamp: Date.now()
     }]);
-    setAuthError(null);
+    setError(null);
   }, [currentPersonality, engine]);
 
   useEffect(() => {
@@ -91,7 +53,7 @@ const App: React.FC = () => {
     if (e) e.preventDefault();
     if (!inputText.trim() || isTyping) return;
 
-    setAuthError(null);
+    setError(null);
     const userMessage: Message = {
       role: 'user',
       text: inputText,
@@ -112,7 +74,7 @@ const App: React.FC = () => {
       }));
 
     try {
-      const activeService = engine === 'deepseek' ? deepseekService : geminiService;
+      const activeService = engine === 'gemini' ? geminiService : deepseekService;
       const stream = activeService.sendMessageStream(
         userMessage.text, 
         history, 
@@ -150,14 +112,14 @@ const App: React.FC = () => {
           return newMessages;
         });
       }
-    } catch (error: any) {
-      console.error("Engine Error:", error);
-      const msg = error.message || "Unknown error";
-      setAuthError(msg);
+    } catch (err: any) {
+      console.error("Chat Error:", err);
+      const errorMessage = err.message || "Произошла ошибка при запросе к API.";
+      setError(errorMessage);
       
       setMessages(prev => [...prev, {
         role: 'assistant',
-        text: `Ошибка выполнения: ${msg}`,
+        text: `**Ошибка:** ${errorMessage}`,
         timestamp: Date.now()
       }]);
       setInputText(currentInput);
@@ -168,91 +130,88 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen w-full bg-[#0d1117] text-slate-200 font-sans">
-      <header className="px-5 py-3 bg-[#161b22]/95 backdrop-blur-md border-b border-[#30363d] flex items-center justify-between z-50">
+      {/* Header */}
+      <header className="px-5 py-3 bg-[#161b22]/90 backdrop-blur-md border-b border-[#30363d] flex items-center justify-between z-50">
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-lg transition-all ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-600'}`}>
-             <span className="text-white text-lg font-black italic">{engine === 'deepseek' ? 'V' : 'G'}</span>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all border ${engine === 'gemini' ? 'bg-indigo-600 border-indigo-400' : 'bg-slate-700 border-slate-500'}`}>
+             <span className="text-white text-xl font-black">{engine === 'gemini' ? 'G' : 'D'}</span>
           </div>
           <div>
-            <h1 className="text-xs font-black uppercase tracking-[0.2em] text-white">
-              {engine === 'deepseek' ? 'DeepSeek' : 'Gemini'} <span className={engine === 'deepseek' ? 'text-[#4D6BFE]' : 'text-cyan-400'}>{engine === 'deepseek' ? 'V3' : '3 PRO'}</span>
+            <h1 className="text-sm font-black uppercase tracking-wider text-white">
+              {engine === 'gemini' ? 'Gemini 3 Pro' : 'DeepSeek V3'}
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={`w-1 h-1 rounded-full ${authError ? 'bg-red-500' : 'bg-green-500'} ${isTyping ? 'animate-pulse' : ''}`}></span>
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                {authError ? 'Error' : botAuth ? 'Bot Linked' : 'Online'}
+              <span className={`w-2 h-2 rounded-full ${isTyping ? 'bg-indigo-500 animate-pulse' : 'bg-green-500'}`}></span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {isTyping ? 'Thinking...' : 'Ready'}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="flex bg-[#0d1117] rounded-lg p-1 border border-[#30363d] scale-90">
-          <button 
-            onClick={() => setEngine('deepseek')}
-            className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${engine === 'deepseek' ? 'bg-[#4D6BFE] text-white' : 'text-slate-500'}`}
-          >
-            DeepSeek V3
-          </button>
+        <div className="flex bg-black/40 rounded-lg p-1 border border-[#30363d]">
           <button 
             onClick={() => setEngine('gemini')}
-            className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${engine === 'gemini' ? 'bg-cyan-600 text-white' : 'text-slate-500'}`}
+            className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition-all ${engine === 'gemini' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
           >
             Gemini
+          </button>
+          <button 
+            onClick={() => setEngine('deepseek')}
+            className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition-all ${engine === 'deepseek' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            DeepSeek
           </button>
         </div>
       </header>
 
-      {authError && (
-        <div className="bg-red-900/20 border-b border-red-500/40 p-3 text-center animate-fade-in flex flex-col items-center gap-2">
-          <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider leading-tight">
-            {authError.includes('401') 
-              ? '⚠️ API ключ не прошел проверку. Убедитесь, что DEEPSEEK_API_KEY добавлен в настройки Vercel и билд перезапущен.' 
-              : `⚠️ ${authError}`}
+      {/* Warning if error exists */}
+      {error && (
+        <div className="bg-red-500/10 border-b border-red-500/30 p-2 text-center">
+          <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest">
+            {error.includes('API_KEY') ? 'ВНИМАНИЕ: API_KEY НЕ НАЙДЕН В ПЕРЕМЕННЫХ ОКРУЖЕНИЯ VERCEL.' : error}
           </p>
         </div>
       )}
 
-      <div className="flex gap-2 p-2 bg-[#0d1117] border-b border-[#30363d] overflow-x-auto hide-scrollbar shrink-0">
+      {/* Personality Selector */}
+      <div className="flex gap-2 p-3 bg-[#0d1117] border-b border-[#30363d] overflow-x-auto hide-scrollbar shrink-0">
         {PERSONALITIES.map(p => (
           <button
             key={p.id}
             onClick={() => setCurrentPersonality(p)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-lg transition-all border text-[9px] font-black uppercase tracking-widest ${
+            className={`flex-shrink-0 px-4 py-2 rounded-xl transition-all border text-[11px] font-bold uppercase tracking-wider flex items-center gap-2 ${
               currentPersonality.id === p.id 
-                ? `${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-600'} border-transparent text-white` 
-                : 'bg-[#161b22] border-[#30363d] text-slate-500'
+                ? 'bg-indigo-600/20 border-indigo-500 text-indigo-100' 
+                : 'bg-slate-900/40 border-[#30363d] text-slate-500 hover:border-slate-500'
             }`}
           >
-            {p.emoji} {p.name}
+            <span>{p.emoji}</span>
+            <span>{p.name}</span>
           </button>
         ))}
       </div>
 
-      <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6 hide-scrollbar relative">
-        {messages.map((msg, i) => <ChatMessage key={i} message={msg} />)}
-        
-        {isTyping && !messages[messages.length-1]?.text && !messages[messages.length-1]?.reasoning && (
-          <div className={`flex items-center gap-4 p-4 bg-[#161b22] rounded-2xl border border-[#30363d] w-fit shadow-xl border-l-4 animate-pulse ${engine === 'deepseek' ? 'border-l-[#4D6BFE]' : 'border-l-cyan-500'}`}>
-            <div className="flex gap-1.5">
-              <div className={`w-1.5 h-1.5 rounded-full animate-bounce ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-500'}`}></div>
-              <div className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.2s] ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-500'}`}></div>
-              <div className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.4s] ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-500'}`}></div>
-            </div>
-            <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${engine === 'deepseek' ? 'text-[#4D6BFE]' : 'text-cyan-500'}`}>
-              {engine === 'deepseek' ? 'Processing V3...' : 'Reasoning...'}
-            </span>
+      {/* Chat Area */}
+      <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6 hide-scrollbar">
+        {messages.length === 0 && (
+          <div className="h-full flex flex-col items-center justify-center opacity-20 grayscale">
+             <div className="text-6xl mb-4">🤖</div>
+             <p className="text-sm font-bold uppercase tracking-[0.3em]">Waiting for input</p>
           </div>
         )}
+        {messages.map((msg, i) => <ChatMessage key={i} message={msg} />)}
         <div ref={chatEndRef} />
       </main>
 
-      <footer className="p-4 bg-[#161b22] border-t border-[#30363d] pb-safe">
-        <form onSubmit={handleSendMessage} className="flex gap-2 max-w-5xl mx-auto items-end">
-          <div className="flex-1">
+      {/* Input Area */}
+      <footer className="p-4 bg-[#161b22]/80 backdrop-blur-lg border-t border-[#30363d] pb-safe">
+        <form onSubmit={handleSendMessage} className="flex gap-3 max-w-5xl mx-auto items-end">
+          <div className="flex-1 relative">
             <textarea 
               rows={1}
-              className={`w-full bg-[#0d1117] border border-[#30363d] rounded-2xl px-5 py-3.5 text-sm text-white placeholder-slate-600 transition-all outline-none resize-none hide-scrollbar focus:border-${engine === 'deepseek' ? '[#4D6BFE]' : 'cyan-500'}`}
-              placeholder={engine === 'deepseek' ? "Запрос к V3..." : "Запрос к Gemini..."}
+              className="w-full bg-[#0d1117] border border-[#30363d] rounded-2xl px-5 py-4 text-[15px] text-white placeholder-slate-600 transition-all outline-none resize-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20"
+              placeholder="Напишите сообщение..."
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               onKeyDown={e => {
@@ -267,11 +226,10 @@ const App: React.FC = () => {
           <button 
             type="submit"
             disabled={!inputText.trim() || isTyping}
-            className={`w-12 h-12 shrink-0 rounded-xl text-white flex items-center justify-center disabled:opacity-20 transition-all active:scale-95 shadow-lg ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-600'}`}
+            className={`w-14 h-14 shrink-0 rounded-2xl text-white flex items-center justify-center disabled:opacity-20 transition-all hover:scale-105 active:scale-95 shadow-xl ${engine === 'gemini' ? 'bg-indigo-600 shadow-indigo-500/20' : 'bg-slate-600 shadow-slate-500/20'}`}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m22 2-7 20-4-9-9-4Z"/>
-              <path d="M22 2 11 13"/>
+            <svg className="w-6 h-6 transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
           </button>
         </form>

@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 
 export interface StreamDelta {
   type: 'reasoning' | 'content';
@@ -7,37 +7,15 @@ export interface StreamDelta {
 }
 
 export class GeminiService {
-  private ai: GoogleGenAI | null = null;
-
-  private getEnvVar(name: string): string | undefined {
-    const p = (typeof process !== 'undefined' ? process : { env: {} }) as any;
-    const w = (window as any).process?.env || {};
-
-    if (name === 'API_KEY') {
-      return (
-        p.env?.API_KEY || 
-        w.API_KEY || 
-        p.env?.NEXT_PUBLIC_API_KEY || 
-        w.NEXT_PUBLIC_API_KEY ||
-        p.env?.VITE_API_KEY ||
-        w.VITE_API_KEY
-      )?.trim();
-    }
-    return undefined;
-  }
-
+  // Инициализируем согласно правилам: всегда через новый экземпляр перед вызовом или по требованию
   private getClient() {
-    const key = this.getEnvVar('API_KEY');
-    if (!this.ai || (this.ai as any).apiKey !== key) {
-      console.debug(`[Gemini] Initializing with key: ${key ? key.substring(0, 6) + '...' : 'NOT FOUND'}`);
-      this.ai = new GoogleGenAI({ apiKey: key || '' });
-    }
-    return this.ai;
+    return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
   }
 
   public async *sendMessageStream(message: string, history: any[], systemInstruction: string) {
     const ai = this.getClient();
     
+    // Преобразование истории в формат Gemini
     const contents = [
       ...history.map(h => ({
         role: h.role === 'assistant' ? 'model' : 'user',
@@ -51,19 +29,26 @@ export class GeminiService {
       contents: contents as any,
       config: {
         systemInstruction: systemInstruction,
-        thinkingConfig: { thinkingBudget: 32768 },
+        // Включаем "мышление" для Pro модели
+        thinkingConfig: { thinkingBudget: 16000 },
         temperature: 1,
       },
     });
 
     for await (const chunk of responseStream) {
-      const parts = chunk.candidates?.[0]?.content?.parts || [];
-      for (const part of parts) {
-        if ((part as any).thought) {
-          yield { type: 'reasoning', content: (part as any).text || '' } as StreamDelta;
-        } else if (part.text) {
-          yield { type: 'content', content: part.text } as StreamDelta;
-        }
+      // Согласно документации, получаем текст напрямую через свойство .text
+      const text = chunk.text;
+      
+      // Попытка извлечь "мысли", если они приходят в специфических полях для Gemini 3
+      // В текущем SDK мысли обычно предшествуют тексту в потоке или находятся в candidates
+      const thought = (chunk as any).candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought;
+      
+      if (thought) {
+        yield { type: 'reasoning', content: thought };
+      }
+      
+      if (text) {
+        yield { type: 'content', content: text };
       }
     }
   }

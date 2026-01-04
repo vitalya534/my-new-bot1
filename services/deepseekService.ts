@@ -6,17 +6,41 @@ export interface StreamDelta {
 
 export class DeepSeekService {
   private getEnvVar(name: string): string | undefined {
-    const env = (window as any).process?.env || {};
-    // Проверяем все возможные источники: глобальный process (Vite/Webpack), 
-    // объект window.process (полифилл) и специфические префиксы Vercel
-    return (
-      (process.env?.[name]) || 
-      (env[name]) || 
-      (process.env?.[`NEXT_PUBLIC_${name}`]) || 
-      (env[`NEXT_PUBLIC_${name}`]) ||
-      (process.env?.[`VITE_${name}`]) || 
-      (env[`VITE_${name}`])
-    )?.trim();
+    // Явный доступ по именам помогает бандлерам (Vite/Next.js/Webpack)
+    // подставлять значения на этапе сборки.
+    const p = (typeof process !== 'undefined' ? process : { env: {} }) as any;
+    const w = (window as any).process?.env || {};
+
+    if (name === 'DEEPSEEK_API_KEY') {
+      return (
+        p.env?.DEEPSEEK_API_KEY || 
+        w.DEEPSEEK_API_KEY || 
+        p.env?.NEXT_PUBLIC_DEEPSEEK_API_KEY || 
+        w.NEXT_PUBLIC_DEEPSEEK_API_KEY ||
+        p.env?.VITE_DEEPSEEK_API_KEY ||
+        w.VITE_DEEPSEEK_API_KEY
+      )?.trim();
+    }
+
+    if (name === 'DEEPSEEK_API_URL') {
+      return (
+        p.env?.DEEPSEEK_API_URL || 
+        w.DEEPSEEK_API_URL || 
+        p.env?.NEXT_PUBLIC_DEEPSEEK_API_URL || 
+        p.env?.VITE_DEEPSEEK_API_URL
+      )?.trim();
+    }
+
+    if (name === 'API_KEY') {
+      return (
+        p.env?.API_KEY || 
+        w.API_KEY || 
+        p.env?.NEXT_PUBLIC_API_KEY || 
+        p.env?.VITE_API_KEY
+      )?.trim();
+    }
+
+    return undefined;
   }
 
   private getApiUrl(): string {
@@ -26,20 +50,20 @@ export class DeepSeekService {
   public async *sendMessageStream(message: string, history: any[], systemInstruction: string) {
     let apiKey = this.getEnvVar('DEEPSEEK_API_KEY');
     
-    // Если специализированный ключ не найден, пробуем общий API_KEY, 
-    // но только если он не выглядит как ключ Gemini
+    // Попытка использовать универсальный API_KEY, если DeepSeek-специфичный не задан
     if (!apiKey) {
       const genericKey = this.getEnvVar('API_KEY');
+      // Используем только если это не ключ Gemini (те начинаются с AIza)
       if (genericKey && !genericKey.startsWith('AIza')) {
         apiKey = genericKey;
       }
     }
     
-    // Отладочный лог (безопасный)
-    console.debug(`[DeepSeek] Using key: ${apiKey ? apiKey.substring(0, 6) + '...' : 'NOT FOUND'}`);
+    // Логируем только факт наличия ключа
+    console.debug(`[DeepSeek] API Key detected: ${apiKey ? 'YES (starts with ' + apiKey.substring(0,4) + ')' : 'NO'}`);
 
     if (!apiKey) {
-      throw new Error("DEEPSEEK_API_KEY не найден в переменных окружения Vercel.");
+      throw new Error("API ключ DeepSeek не найден. Убедитесь, что вы добавили DEEPSEEK_API_KEY в Environment Variables на Vercel и перезапустили Deployment.");
     }
 
     const response = await fetch(this.getApiUrl(), {
@@ -71,7 +95,7 @@ export class DeepSeekService {
       } catch (e) {}
       
       if (response.status === 401) {
-        throw new Error(`Ошибка 401: Ключ (${apiKey.substring(0, 4)}...) недействителен или баланс DeepSeek пуст.`);
+        throw new Error(`Ошибка 401: Ключ (${apiKey.substring(0, 4)}...) не авторизован. Проверьте баланс на deepseek.com.`);
       }
       
       throw new Error(`DeepSeek API Error: ${errorMessage}`);

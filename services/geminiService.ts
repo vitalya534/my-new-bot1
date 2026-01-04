@@ -10,21 +10,26 @@ export class GeminiService {
   private ai: GoogleGenAI | null = null;
 
   private getEnvVar(name: string): string | undefined {
-    const env = (window as any).process?.env || {};
-    return (
-      (process.env?.[name]) || 
-      (env[name]) || 
-      (process.env?.[`NEXT_PUBLIC_${name}`]) || 
-      (env[`NEXT_PUBLIC_${name}`]) ||
-      (process.env?.[`VITE_${name}`]) || 
-      (env[`VITE_${name}`])
-    )?.trim();
+    const p = (typeof process !== 'undefined' ? process : { env: {} }) as any;
+    const w = (window as any).process?.env || {};
+
+    if (name === 'API_KEY') {
+      return (
+        p.env?.API_KEY || 
+        w.API_KEY || 
+        p.env?.NEXT_PUBLIC_API_KEY || 
+        w.NEXT_PUBLIC_API_KEY ||
+        p.env?.VITE_API_KEY ||
+        w.VITE_API_KEY
+      )?.trim();
+    }
+    return undefined;
   }
 
   private getClient() {
-    if (!this.ai) {
-      const key = this.getEnvVar('API_KEY');
-      console.debug(`[Gemini] Using key: ${key ? key.substring(0, 6) + '...' : 'NOT FOUND'}`);
+    const key = this.getEnvVar('API_KEY');
+    if (!this.ai || (this.ai as any).apiKey !== key) {
+      console.debug(`[Gemini] Initializing with key: ${key ? key.substring(0, 6) + '...' : 'NOT FOUND'}`);
       this.ai = new GoogleGenAI({ apiKey: key || '' });
     }
     return this.ai;

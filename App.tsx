@@ -27,15 +27,19 @@ const App: React.FC = () => {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const getEnvVar = (name: string): string | undefined => {
-    const env = (window as any).process?.env || {};
-    return (
-      (process.env?.[name]) || 
-      (env[name]) || 
-      (process.env?.[`NEXT_PUBLIC_${name}`]) || 
-      (env[`NEXT_PUBLIC_${name}`]) ||
-      (process.env?.[`VITE_${name}`]) || 
-      (env[`VITE_${name}`])
-    )?.trim();
+    const p = (typeof process !== 'undefined' ? process : { env: {} }) as any;
+    const w = (window as any).process?.env || {};
+    
+    if (name === 'DEEPSEEK_API_KEY') {
+      return (p.env?.DEEPSEEK_API_KEY || w.DEEPSEEK_API_KEY || p.env?.NEXT_PUBLIC_DEEPSEEK_API_KEY || p.env?.VITE_DEEPSEEK_API_KEY)?.trim();
+    }
+    if (name === 'API_KEY') {
+      return (p.env?.API_KEY || w.API_KEY || p.env?.NEXT_PUBLIC_API_KEY || p.env?.VITE_API_KEY)?.trim();
+    }
+    if (name === 'BOT_TOKEN') {
+      return (p.env?.BOT_TOKEN || w.BOT_TOKEN || p.env?.NEXT_PUBLIC_BOT_TOKEN || p.env?.VITE_BOT_TOKEN)?.trim();
+    }
+    return undefined;
   };
 
   useEffect(() => {
@@ -47,7 +51,7 @@ const App: React.FC = () => {
       setBotAuth(true);
     }
 
-    // Приоритет Gemini, если ключ похож на Gemini и нет ключа DeepSeek
+    // Автоматический выбор движка
     if (gKey?.startsWith('AIza') && !dsKey) {
       setEngine('gemini');
     } else {
@@ -60,6 +64,13 @@ const App: React.FC = () => {
       tg.expand();
       tg.setHeaderColor('#0d1117');
     }
+    
+    console.debug("[App] Engine check:", { 
+      hasDeepSeek: !!dsKey, 
+      hasGemini: !!gKey, 
+      hasBotToken: !!botToken,
+      engine 
+    });
   }, []);
 
   useEffect(() => {
@@ -195,7 +206,7 @@ const App: React.FC = () => {
         <div className="bg-red-900/20 border-b border-red-500/40 p-3 text-center animate-fade-in flex flex-col items-center gap-2">
           <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider leading-tight">
             {authError.includes('401') 
-              ? '⚠️ API ключ не принят сервером. Проверьте баланс DeepSeek и корректность переменной DEEPSEEK_API_KEY в Vercel.' 
+              ? '⚠️ API ключ не прошел проверку. Убедитесь, что DEEPSEEK_API_KEY добавлен в настройки Vercel и билд перезапущен.' 
               : `⚠️ ${authError}`}
           </p>
         </div>

@@ -5,19 +5,23 @@ export interface StreamDelta {
 }
 
 export class DeepSeekService {
-  private apiUrl = 'https://api.deepseek.com/v1/chat/completions';
+  private apiUrl = 'https://api.deepseek.com/chat/completions';
 
   public async *sendMessageStream(message: string, history: any[], systemInstruction: string) {
-    // Robust key retrieval looking into standard process.env, window.process, and import.meta.env
     const apiKey = (
-      (typeof process !== 'undefined' && process.env?.API_KEY) || 
-      (window as any).process?.env?.API_KEY || 
-      (import.meta as any).env?.VITE_API_KEY ||
-      (import.meta as any).env?.API_KEY
+      (typeof process !== 'undefined' && (process.env?.DEEPSEEK_API_KEY || process.env?.API_KEY)) || 
+      (window as any).process?.env?.DEEPSEEK_API_KEY || 
+      (window as any).process?.env?.API_KEY ||
+      (import.meta as any).env?.VITE_DEEPSEEK_API_KEY ||
+      (import.meta as any).env?.VITE_API_KEY
     )?.trim();
     
     if (!apiKey) {
-      throw new Error("API_KEY не обнаружен. Проверьте настройки окружения в Vercel.");
+      throw new Error("API_KEY не обнаружен. Проверьте настройки Environment Variables.");
+    }
+
+    if (apiKey.startsWith('AIza')) {
+      throw new Error("Вы пытаетесь использовать ключ Google Gemini для DeepSeek. Это разные сервисы. Пожалуйста, переключитесь на движок Gemini в заголовке или добавьте ключ от DeepSeek.");
     }
 
     const response = await fetch(this.apiUrl, {
@@ -48,7 +52,7 @@ export class DeepSeekService {
       } catch (e) {}
       
       if (response.status === 401) {
-        throw new Error("Ошибка авторизации: Ключ API недействителен для DeepSeek. Убедитесь, что вы используете ключ от api.deepseek.com, а не от Google.");
+        throw new Error(`Ошибка авторизации (401): Ключ не принят DeepSeek. Убедитесь, что ваш ключ корректен и баланс пополнен на api.deepseek.com.`);
       }
       
       throw new Error(`DeepSeek API Error: ${errorMessage}`);

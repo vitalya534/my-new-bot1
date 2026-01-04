@@ -4,6 +4,7 @@ import { PERSONALITIES } from './constants';
 import { Message, Personality } from './types';
 import ChatMessage from './components/ChatMessage';
 import { deepseekService } from './services/deepseekService';
+import { geminiService } from './services/geminiService';
 
 declare global {
   interface Window {
@@ -12,13 +13,34 @@ declare global {
   }
 }
 
+type EngineType = 'deepseek' | 'gemini';
+
 const App: React.FC = () => {
   const [currentPersonality, setCurrentPersonality] = useState<Personality>(PERSONALITIES[0]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [engine, setEngine] = useState<EngineType>('deepseek');
+  const [authError, setAuthError] = useState<string | null>(null);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-detect engine based on key prefix on mount
+  useEffect(() => {
+    const key = (
+      (typeof process !== 'undefined' && (process.env?.API_KEY || process.env?.DEEPSEEK_API_KEY)) || 
+      (window as any).process?.env?.API_KEY || 
+      (window as any).process?.env?.DEEPSEEK_API_KEY
+    )?.trim();
+
+    if (key && key.startsWith('AIza')) {
+      console.log("Detected Gemini API Key. Switching default engine to Gemini.");
+      setEngine('gemini');
+    } else if (key && key.startsWith('sk-')) {
+      console.log("Detected DeepSeek/OpenAI-compatible API Key. Staying on DeepSeek.");
+      setEngine('deepseek');
+    }
+  }, []);
 
   useEffect(() => {
     if (window.Telegram?.WebApp) {
@@ -32,10 +54,11 @@ const App: React.FC = () => {
   useEffect(() => {
     setMessages([{
       role: 'assistant',
-      text: `DeepSeek-R1 активен. Режим: ${currentPersonality.name}. Чем я могу помочь сегодня?`,
+      text: `Движок ${engine === 'deepseek' ? 'DeepSeek R1' : 'Gemini 3 Pro'} активен. Режим: ${currentPersonality.name}. Чем я могу помочь?`,
       timestamp: Date.now()
     }]);
-  }, [currentPersonality]);
+    setAuthError(null);
+  }, [currentPersonality, engine]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -45,6 +68,7 @@ const App: React.FC = () => {
     if (e) e.preventDefault();
     if (!inputText.trim() || isTyping) return;
 
+    setAuthError(null);
     const userMessage: Message = {
       role: 'user',
       text: inputText,
@@ -65,7 +89,10 @@ const App: React.FC = () => {
       }));
 
     try {
-      const stream = deepseekService.sendMessageStream(
+      const activeService = engine === 'deepseek' ? deepseekService : geminiService;
+      if (!activeService) throw new Error("Service not initialized");
+
+      const stream = activeService.sendMessageStream(
         userMessage.text, 
         history, 
         currentPersonality.instruction
@@ -75,7 +102,7 @@ const App: React.FC = () => {
       let fullText = '';
       let fullReasoning = '';
 
-      for await (const chunk of stream) {
+      for await (const chunk of (stream as any)) {
         if (!streamStarted) {
           streamStarted = true;
           setMessages(prev => [...prev, { 
@@ -103,10 +130,13 @@ const App: React.FC = () => {
         });
       }
     } catch (error: any) {
-      console.error("DeepSeek Error:", error);
+      console.error("Engine Error:", error);
+      const errorMsg = error.message || "Unknown error";
+      setAuthError(errorMsg);
+
       setMessages(prev => [...prev, {
         role: 'assistant',
-        text: `Ошибка API: ${error.message}. Убедитесь, что ваш ключ API от DeepSeek корректен.`,
+        text: `Ошибка: ${errorMsg}`,
         timestamp: Date.now()
       }]);
       setInputText(currentInput);
@@ -117,32 +147,55 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen w-full bg-[#0d1117] text-slate-200 font-sans">
-      <header className="px-5 py-3.5 bg-[#161b22]/95 backdrop-blur-md border-b border-[#30363d] flex items-center justify-between z-50">
+      <header className="px-5 py-3 bg-[#161b22]/95 backdrop-blur-md border-b border-[#30363d] flex items-center justify-between z-50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#4D6BFE] flex items-center justify-center shadow-[0_0_20px_rgba(77,107,254,0.3)]">
-             <span className="text-white text-xl font-black italic">D</span>
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-lg transition-all duration-500 ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-600'}`}>
+             <span className="text-white text-lg font-black italic">{engine === 'deepseek' ? 'D' : 'G'}</span>
           </div>
           <div>
-            <h1 className="text-sm font-black uppercase tracking-[0.2em] text-white">
-              DeepSeek <span className="text-[#4D6BFE]">R1</span>
+            <h1 className="text-xs font-black uppercase tracking-[0.2em] text-white">
+              {engine === 'deepseek' ? 'DeepSeek' : 'Gemini'} <span className={engine === 'deepseek' ? 'text-[#4D6BFE]' : 'text-cyan-400'}>{engine === 'deepseek' ? 'R1' : '3 PRO'}</span>
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Reasoning Active</span>
+              <span className={`w-1 h-1 rounded-full animate-pulse ${authError ? 'bg-red-500' : 'bg-green-500'}`}></span>
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{authError ? 'Error' : 'Ready'}</span>
             </div>
           </div>
         </div>
+
+        <div className="flex bg-[#0d1117] rounded-lg p-1 border border-[#30363d] scale-90">
+          <button 
+            onClick={() => setEngine('deepseek')}
+            className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${engine === 'deepseek' ? 'bg-[#4D6BFE] text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            DS R1
+          </button>
+          <button 
+            onClick={() => setEngine('gemini')}
+            className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${engine === 'gemini' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            Gemini
+          </button>
+        </div>
       </header>
 
-      <div className="flex gap-2 p-3 bg-[#0d1117] border-b border-[#30363d] overflow-x-auto hide-scrollbar shrink-0">
+      {authError && (
+        <div className="bg-red-900/20 border-b border-red-500/50 p-3 text-center">
+          <p className="text-[11px] text-red-400 font-bold uppercase tracking-wider leading-relaxed">
+            {authError.includes('401') ? '⚠️ Ключ не подходит для DeepSeek. Попробуйте переключиться на Gemini 3 Pro (кнопка вверху справа).' : `⚠️ ${authError}`}
+          </p>
+        </div>
+      )}
+
+      <div className="flex gap-2 p-2 bg-[#0d1117] border-b border-[#30363d] overflow-x-auto hide-scrollbar shrink-0">
         {PERSONALITIES.map(p => (
           <button
             key={p.id}
             onClick={() => setCurrentPersonality(p)}
-            className={`flex-shrink-0 px-4 py-2 rounded-xl transition-all border text-[10px] font-black uppercase tracking-widest ${
+            className={`flex-shrink-0 px-3 py-1.5 rounded-lg transition-all border text-[9px] font-black uppercase tracking-widest ${
               currentPersonality.id === p.id 
-                ? 'bg-[#4D6BFE] border-transparent text-white shadow-lg' 
-                : 'bg-[#161b22] border-[#30363d] text-slate-500 hover:text-slate-300'
+                ? `${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-600'} border-transparent text-white shadow-md` 
+                : 'bg-[#161b22] border-[#30363d] text-slate-500 hover:border-slate-500'
             }`}
           >
             {p.emoji} {p.name}
@@ -150,29 +203,31 @@ const App: React.FC = () => {
         ))}
       </div>
 
-      <main className="flex-1 overflow-y-auto px-4 py-8 space-y-6 hide-scrollbar">
+      <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6 hide-scrollbar relative">
         {messages.map((msg, i) => <ChatMessage key={i} message={msg} />)}
         
         {isTyping && !messages[messages.length-1]?.text && !messages[messages.length-1]?.reasoning && (
-          <div className="flex items-center gap-4 p-5 bg-[#161b22] rounded-2xl border border-[#30363d] w-fit shadow-xl border-l-[#4D6BFE] border-l-4">
+          <div className={`flex items-center gap-4 p-4 bg-[#161b22] rounded-2xl border border-[#30363d] w-fit shadow-xl border-l-4 animate-pulse ${engine === 'deepseek' ? 'border-l-[#4D6BFE]' : 'border-l-cyan-500'}`}>
             <div className="flex gap-1.5">
-              <div className="w-2 h-2 bg-[#4D6BFE] rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-[#4D6BFE] rounded-full animate-bounce [animation-delay:0.2s]"></div>
-              <div className="w-2 h-2 bg-[#4D6BFE] rounded-full animate-bounce [animation-delay:0.4s]"></div>
+              <div className={`w-1.5 h-1.5 rounded-full animate-bounce ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-500'}`}></div>
+              <div className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.2s] ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-500'}`}></div>
+              <div className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.4s] ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-500'}`}></div>
             </div>
-            <span className="text-xs font-black text-[#4D6BFE] uppercase tracking-[0.3em]">Neural Think...</span>
+            <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${engine === 'deepseek' ? 'text-[#4D6BFE]' : 'text-cyan-500'}`}>
+              Анализ запроса...
+            </span>
           </div>
         )}
         <div ref={chatEndRef} />
       </main>
 
       <footer className="p-4 bg-[#161b22] border-t border-[#30363d] pb-safe">
-        <form onSubmit={handleSendMessage} className="flex gap-3 max-w-5xl mx-auto items-end">
+        <form onSubmit={handleSendMessage} className="flex gap-2 max-w-5xl mx-auto items-end">
           <div className="flex-1">
             <textarea 
               rows={1}
-              className="w-full bg-[#0d1117] border border-[#30363d] rounded-2xl px-6 py-4 text-sm text-white placeholder-slate-600 focus:border-[#4D6BFE] transition-all outline-none resize-none hide-scrollbar"
-              placeholder="Введите сообщение..."
+              className={`w-full bg-[#0d1117] border border-[#30363d] rounded-2xl px-5 py-3.5 text-sm text-white placeholder-slate-600 transition-all outline-none resize-none hide-scrollbar focus:border-${engine === 'deepseek' ? '[#4D6BFE]' : 'cyan-500'}`}
+              placeholder={engine === 'deepseek' ? "Запрос к DeepSeek..." : "Запрос к Gemini..."}
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               onKeyDown={e => {
@@ -187,9 +242,9 @@ const App: React.FC = () => {
           <button 
             type="submit"
             disabled={!inputText.trim() || isTyping}
-            className="w-14 h-14 shrink-0 rounded-2xl bg-[#4D6BFE] text-white flex items-center justify-center disabled:opacity-20 transition-all active:scale-95 shadow-xl shadow-blue-900/40"
+            className={`w-12 h-12 shrink-0 rounded-xl text-white flex items-center justify-center disabled:opacity-20 transition-all active:scale-95 shadow-lg ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-600'}`}
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
               <path d="m22 2-7 20-4-9-9-4Z"/>
               <path d="M22 2 11 13"/>
             </svg>

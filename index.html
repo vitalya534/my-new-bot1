@@ -3,20 +3,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Persona Assistant</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gemini AI Assistant</title>
     
     <script>
-        // Ensure process.env is available globally without overwriting existing values
-        window.process = window.process || {};
-        window.process.env = window.process.env || {};
+        window.process = { env: { API_KEY: "" } };
         
         window.addEventListener('error', function(event) {
             const display = document.getElementById('error-display');
             if (display) {
                 display.style.display = 'block';
                 display.innerHTML += `<div class="p-2 border-b border-red-200 text-red-700 font-mono text-[10px]">
-                    <strong>Runtime Error:</strong> ${event.message}
+                    <strong>Error:</strong> ${event.message}
                 </div>`;
             }
         });
@@ -27,18 +25,25 @@
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        :root {
+            --tg-theme-bg-color: #f8fafc;
+            --tg-theme-text-color: #0f172a;
+        }
         body {
             font-family: 'Inter', sans-serif;
-            -webkit-tap-highlight-color: transparent;
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
             margin: 0;
             padding: 0;
-            background-color: #f8fafc;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
         }
         .glass {
-            background: rgba(255, 255, 255, 0.75);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
         }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -51,35 +56,28 @@
             color: #9f1239;
             z-index: 10000;
             padding: 0.5rem;
-            max-height: 30vh;
+            max-height: 25vh;
             overflow-y: auto;
-            border-bottom: 2px solid #fda4af;
         }
+        input:focus { outline: none; }
     </style>
 
     <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.3.1",
-        "react-dom": "https://esm.sh/react-dom@18.3.1",
-        "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
-        "react/": "https://esm.sh/react@18.3.1/",
-        "react-dom/": "https://esm.sh/react-dom@18.3.1/",
-        "@google/genai": "https://esm.sh/@google/genai@1.34.0"
-      }
-    }
-    </script>
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "@google/genai": "https://esm.sh/@google/genai@1.34.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
+  }
+}
+</script>
 </head>
-<body class="text-slate-900">
+<body>
     <div id="error-display"></div>
-    
-    <div id="root">
-        <div class="flex items-center justify-center h-screen flex-col gap-4">
-            <div class="w-10 h-10 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-            <p class="text-slate-500 font-medium animate-pulse text-sm">Запуск системы...</p>
-        </div>
-    </div>
-
+    <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
 </body>
 </html>

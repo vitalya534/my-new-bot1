@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 export interface StreamDelta {
   type: 'reasoning' | 'content';
@@ -7,7 +7,7 @@ export interface StreamDelta {
 }
 
 export class GeminiService {
-  // Инициализируем согласно правилам: всегда через новый экземпляр перед вызовом или по требованию
+  // Согласно инструкции: всегда используем новый экземпляр перед вызовом
   private getClient() {
     return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
   }
@@ -29,19 +29,19 @@ export class GeminiService {
       contents: contents as any,
       config: {
         systemInstruction: systemInstruction,
-        // Включаем "мышление" для Pro модели
-        thinkingConfig: { thinkingBudget: 16000 },
-        temperature: 1,
+        // Максимальный бюджет для глубокого рассуждения (thinking)
+        thinkingConfig: { thinkingBudget: 32768 },
       },
     });
 
     for await (const chunk of responseStream) {
-      // Согласно документации, получаем текст напрямую через свойство .text
+      // Получаем текст напрямую через свойство .text согласно правилам
       const text = chunk.text;
       
-      // Попытка извлечь "мысли", если они приходят в специфических полях для Gemini 3
-      // В текущем SDK мысли обычно предшествуют тексту в потоке или находятся в candidates
-      const thought = (chunk as any).candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought;
+      // Извлекаем мысли (thought process) из частей ответа
+      // В Gemini 3 "мысли" приходят как часть контента с полем thought
+      const thoughtPart = chunk.candidates?.[0]?.content?.parts?.find((p: any) => p.thought);
+      const thought = thoughtPart ? (thoughtPart as any).thought : null;
       
       if (thought) {
         yield { type: 'reasoning', content: thought };

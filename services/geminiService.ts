@@ -1,13 +1,14 @@
 
-import { GoogleGenAI, GenerateContentResponse, Chat } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
-const MODEL_NAME = 'gemini-3-flash-preview';
+const MODEL_NAME = 'gemini-3-pro-preview';
 
 export class GeminiService {
   private currentInstruction: string = "";
 
   public initChat(systemInstruction: string) {
-    this.currentInstruction = systemInstruction;
+    // Adding global reasoning requirement to match DeepSeek R1 style
+    this.currentInstruction = `${systemInstruction} ALWAYS use step-by-step reasoning. Be extremely analytical and precise. Even for simple questions, ensure your internal logic is sound.`;
   }
 
   public async *sendMessageStream(message: string, history: { role: string, parts: { text: string }[] }[] = []) {
@@ -16,19 +17,21 @@ export class GeminiService {
       throw new Error("MISSING_API_KEY");
     }
 
+    // New instance per call to ensure we pick up fresh API keys from the session
     const ai = new GoogleGenAI({ apiKey });
     
-    // We create a fresh chat instance for each stream to ensure we use the current API Key
-    const chat = ai.chats.create({
-      model: MODEL_NAME,
-      config: {
-        systemInstruction: this.currentInstruction,
-        temperature: 0.8,
-      },
-      history: history
-    });
-
     try {
+      const chat = ai.chats.create({
+        model: MODEL_NAME,
+        config: {
+          systemInstruction: this.currentInstruction,
+          temperature: 0.7, // Lower temperature for more stable reasoning
+          // Max thinking budget for deep chain-of-thought processing
+          thinkingConfig: { thinkingBudget: 32768 }
+        },
+        history: history
+      });
+
       const result = await chat.sendMessageStream({ message });
       for await (const chunk of result) {
         const response = chunk as GenerateContentResponse;
@@ -36,8 +39,8 @@ export class GeminiService {
         if (text) yield text;
       }
     } catch (error: any) {
-      console.error("Gemini service error:", error);
-      if (error.message?.includes('403') || error.message?.includes('not found')) {
+      console.error("Gemini Reasoning Error:", error);
+      if (error.message?.includes('403') || error.message?.includes('not found') || error.message?.includes('API_KEY')) {
         throw new Error("AUTH_ERROR");
       }
       throw error;

@@ -22,13 +22,12 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [userName, setUserName] = useState('Друг');
+  const [userName, setUserName] = useState('Пользователь');
   const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'missing' | 'ready'>('checking');
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Initializing Telegram WebApp
     if (window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
       tg.ready();
@@ -38,36 +37,32 @@ const App: React.FC = () => {
       }
     }
     
-    // Check API Key status
     const checkKey = async () => {
       if (window.aistudio) {
         try {
           const hasKey = await window.aistudio.hasSelectedApiKey();
           setApiKeyStatus(hasKey ? 'ready' : 'missing');
         } catch (e) {
-          console.error("Key check failed", e);
           setApiKeyStatus('missing');
         }
       } else {
-        // Fallback for non-AI Studio environments (where process.env might be set)
         setApiKeyStatus(process.env.API_KEY ? 'ready' : 'missing');
       }
     };
     checkKey();
   }, []);
 
-  // Update system prompt and set welcome message when personality changes
   useEffect(() => {
     if (apiKeyStatus !== 'ready') return;
     
     geminiService.initChat(currentPersonality.instruction);
     const welcomeMsg: Message = {
       role: 'model',
-      text: `Привет, ${userName}! Теперь я в режиме "${currentPersonality.name}". О чем поболтаем?`,
+      text: `Система Reasoning активна. Движок: Deep-Think (Gemini 3 Pro). Режим: ${currentPersonality.name}. Готов к глубокому анализу.`,
       timestamp: Date.now()
     };
     setMessages([welcomeMsg]);
-  }, [currentPersonality, userName, apiKeyStatus]);
+  }, [currentPersonality, apiKeyStatus]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -122,16 +117,14 @@ const App: React.FC = () => {
         });
       }
     } catch (error: any) {
-      console.error("Streaming failed:", error);
       const isAuthError = error.message === "AUTH_ERROR" || error.message === "MISSING_API_KEY";
-      
       if (isAuthError) setApiKeyStatus('missing');
 
       setMessages(prev => [...prev, {
         role: 'model',
         text: isAuthError 
-          ? "⚠️ Похоже, возникла проблема с API-ключом. Пожалуйста, настройте его заново." 
-          : "⚠️ Ой! Произошла ошибка. Попробуй отправить сообщение еще раз.",
+          ? "⚠️ Требуется обновление API-ключа для доступа к Reasoning Engine." 
+          : "⚠️ Критическая ошибка анализа. Повторите попытку.",
         timestamp: Date.now()
       }]);
       setInputText(currentInput);
@@ -142,65 +135,67 @@ const App: React.FC = () => {
 
   if (apiKeyStatus === 'checking') {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-slate-50 gap-4">
-        <div className="w-12 h-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
-        <p className="text-slate-500 font-medium animate-pulse">Загрузка...</p>
+      <div className="flex flex-col items-center justify-center h-screen bg-slate-900 gap-4">
+        <div className="w-12 h-12 border-4 border-slate-700 border-t-cyan-500 rounded-full animate-spin"></div>
+        <p className="text-slate-400 font-mono text-sm tracking-widest uppercase animate-pulse">Initializing Deep-Think...</p>
       </div>
     );
   }
 
   if (apiKeyStatus === 'missing') {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-white p-8 text-center animate-fade-in">
-        <div className="text-6xl mb-6">🔑</div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-2">Настройка API Ключа</h2>
-        <p className="text-slate-500 mb-8 max-w-xs">
-          Для общения с Gemini необходимо выбрать активный платный проект в Google AI Studio.
+      <div className="flex flex-col items-center justify-center h-screen bg-slate-900 p-8 text-center animate-fade-in">
+        <div className="text-6xl mb-6 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]">💎</div>
+        <h2 className="text-2xl font-bold text-white mb-2">DeepSeek-Style Reasoning</h2>
+        <p className="text-slate-400 mb-8 max-w-xs font-light">
+          Для работы мощного интеллекта с глубоким размышлением требуется подключение API ключа.
         </p>
         <button 
           onClick={handleSetupKey}
-          className="w-full max-w-xs bg-indigo-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-100 active:scale-95 transition-transform"
+          className="w-full max-w-xs bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-cyan-900/40 active:scale-95 transition-all"
         >
-          Настроить API Ключ
+          АКТИВИРОВАТЬ ДВИЖОК
         </button>
         <a 
           href="https://ai.google.dev/gemini-api/docs/billing" 
           target="_blank" 
-          className="mt-6 text-sm text-indigo-500 underline"
+          className="mt-6 text-xs text-slate-500 hover:text-cyan-400 underline transition-colors"
         >
-          Как это работает?
+          Инструкция по биллингу (Google AI Studio)
         </a>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen w-full bg-slate-50 relative overflow-hidden animate-fade-in">
-      {/* Header */}
-      <header className="px-5 py-3 glass z-30 shrink-0 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-slate-800 leading-tight">
-            Чат с <span className="text-indigo-600">{userName}</span>
-          </h1>
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-            <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Gemini 3 Flash</span>
+    <div className="flex flex-col h-screen w-full bg-slate-950 relative overflow-hidden animate-fade-in font-sans">
+      <header className="px-5 py-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 z-30 shrink-0 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-cyan-500 flex items-center justify-center shadow-[0_0_10px_rgba(6,182,212,0.4)]">
+             <span className="text-white text-xs font-black">DS</span>
+          </div>
+          <div>
+            <h1 className="text-sm font-bold text-white leading-tight uppercase tracking-wider">
+              Reasoning <span className="text-cyan-400">Engine</span>
+            </h1>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_5px_rgba(34,197,94,0.6)]"></span>
+              <span className="text-[9px] text-slate-400 uppercase font-black">Connected to DeepThink R1</span>
+            </div>
           </div>
         </div>
         <button 
           onClick={() => setApiKeyStatus('missing')}
-          className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
-          title="Настройки ключа"
+          className="p-2 text-slate-500 hover:text-cyan-400 transition-colors bg-slate-800 rounded-lg"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
             <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
           </svg>
         </button>
       </header>
 
-      {/* Personality Selection */}
-      <div className="px-4 py-4 personality-grid bg-slate-50/80 backdrop-blur-sm z-20 border-b border-slate-100 shrink-0">
+      <div className="px-4 py-4 personality-grid bg-slate-950/50 backdrop-blur-sm z-20 border-b border-slate-900 shrink-0">
         {PERSONALITIES.map(p => (
           <PersonalityCard 
             key={p.id} 
@@ -211,17 +206,20 @@ const App: React.FC = () => {
         ))}
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 hide-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 py-6 hide-scrollbar bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.05),transparent)]">
         {messages.map((msg, i) => <ChatMessage key={`${msg.timestamp}-${i}`} message={msg} />)}
         
         {isTyping && (!messages[messages.length-1]?.text) && (
           <div className="flex justify-start mb-6 animate-fade-in">
-            <div className="bg-white px-5 py-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm">
+            <div className="bg-slate-900 px-5 py-4 rounded-2xl rounded-tl-none border border-slate-800 shadow-xl flex flex-col gap-2 min-w-[200px]">
+              <div className="flex items-center gap-2">
+                 <div className="w-2 h-2 bg-cyan-500 rounded-full animate-ping"></div>
+                 <div className="text-[10px] text-cyan-400 font-black uppercase tracking-widest">Chain-of-thought analysis...</div>
+              </div>
               <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></div>
-                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                <div className="w-1.5 h-1.5 bg-slate-700 rounded-full animate-bounce"></div>
+                <div className="w-1.5 h-1.5 bg-slate-700 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                <div className="w-1.5 h-1.5 bg-slate-700 rounded-full animate-bounce [animation-delay:0.4s]"></div>
               </div>
             </div>
           </div>
@@ -230,13 +228,12 @@ const App: React.FC = () => {
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input */}
-      <footer className="p-4 glass border-t border-slate-100 z-30 shrink-0 pb-safe">
+      <footer className="p-4 bg-slate-900 border-t border-slate-800 z-30 shrink-0 pb-safe">
         <form onSubmit={handleSendMessage} className="flex gap-3">
           <input 
             type="text"
-            className="flex-1 bg-white border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-medium shadow-inner focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 transition-all"
-            placeholder="Спроси о чем-нибудь..."
+            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-5 py-4 text-sm font-medium text-white placeholder-slate-600 shadow-inner focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all outline-none"
+            placeholder="Введите запрос для глубокого анализа..."
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             disabled={isTyping}
@@ -244,13 +241,13 @@ const App: React.FC = () => {
           <button 
             type="submit"
             disabled={!inputText.trim() || isTyping}
-            className={`p-4 rounded-2xl transition-all active:scale-90 flex items-center justify-center ${
+            className={`p-4 rounded-xl transition-all active:scale-90 flex items-center justify-center ${
               !inputText.trim() || isTyping 
-                ? 'bg-slate-100 text-slate-300' 
-                : 'bg-indigo-600 text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700'
+                ? 'bg-slate-800 text-slate-600' 
+                : 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/20 hover:bg-cyan-500'
             }`}
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
               <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>

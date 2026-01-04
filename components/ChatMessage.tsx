@@ -9,7 +9,6 @@ interface ChatMessageProps {
 const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isUser = message.role === 'user';
   
-  // Safety check to ensure we only try to render strings or primitives
   const content = typeof message.text === 'string' 
     ? message.text 
     : JSON.stringify(message.text);
@@ -17,17 +16,17 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   if (!content && message.role === 'model') return null;
 
   return (
-    <div className={`flex w-full mb-5 ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
+    <div className={`flex w-full mb-6 ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
       <div 
-        className={`max-w-[88%] px-5 py-3.5 rounded-2xl shadow-sm text-[15px] leading-relaxed relative ${
+        className={`max-w-[92%] px-5 py-4 rounded-2xl shadow-2xl text-[14px] leading-relaxed relative border ${
           isUser 
-            ? 'bg-slate-900 text-white rounded-tr-none' 
-            : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
+            ? 'bg-cyan-600 text-white rounded-tr-none border-cyan-500' 
+            : 'bg-slate-900 text-slate-200 rounded-tl-none border-slate-800'
         }`}
       >
-        <p className="whitespace-pre-wrap">{content}</p>
-        <div className={`text-[10px] mt-2 font-bold tracking-tight uppercase opacity-30 ${isUser ? 'text-right' : 'text-left'}`}>
-          {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <p className="whitespace-pre-wrap font-medium">{content}</p>
+        <div className={`text-[9px] mt-3 font-black tracking-widest uppercase opacity-40 ${isUser ? 'text-right' : 'text-left'}`}>
+          {isUser ? 'User Terminal' : 'Reasoning Engine'} • {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
     </div>

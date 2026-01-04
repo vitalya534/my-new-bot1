@@ -12,22 +12,23 @@ const PersonalityCard: React.FC<PersonalityCardProps> = ({ personality, isActive
   return (
     <button
       onClick={onClick}
-      className={`relative flex flex-col items-center justify-center p-4 rounded-2xl transition-all duration-300 transform border-2 ${
+      className={`relative flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-300 transform border-2 ${
         isActive 
-          ? `scale-105 border-slate-900 shadow-xl z-10 ${personality.color} text-white` 
-          : 'border-transparent bg-white shadow-md hover:shadow-lg hover:-translate-y-1 text-slate-700'
+          ? `scale-105 border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.3)] z-10 bg-slate-800 text-white` 
+          : 'border-transparent bg-slate-900/50 text-slate-500 hover:bg-slate-800'
       }`}
     >
-      <span className="text-4xl mb-2 drop-shadow-sm">{personality.emoji}</span>
-      <span className="font-bold text-sm tracking-tight">{personality.name}</span>
-      <span className={`text-[10px] mt-1 leading-tight opacity-80 ${isActive ? 'text-white' : 'text-slate-500'}`}>
-        {personality.description}
+      <span className={`text-2xl mb-1 transition-transform ${isActive ? 'scale-110 rotate-3' : 'grayscale opacity-50'}`}>
+        {personality.emoji}
+      </span>
+      <span className={`font-black text-[10px] uppercase tracking-tighter ${isActive ? 'text-cyan-400' : 'text-slate-600'}`}>
+        {personality.name}
       </span>
       
       {isActive && (
-        <div className="absolute -top-1 -right-1 flex h-4 w-4">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-4 w-4 bg-white border-2 border-slate-900"></span>
+        <div className="absolute -top-1 -right-1 flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
         </div>
       )}
     </button>

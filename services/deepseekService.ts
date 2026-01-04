@@ -36,7 +36,7 @@ export class DeepSeekService {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "deepseek-reasoner",
+        model: "deepseek-chat", // Переключено на V3 (мощная чат-модель без принудительного reasoning)
         messages: [
           { role: "system", content: systemInstruction },
           ...history,
@@ -90,6 +90,7 @@ export class DeepSeekService {
           const delta = data.choices?.[0]?.delta;
           if (!delta) continue;
           
+          // V3 обычно не возвращает reasoning_content, но мы оставляем логику для совместимости
           if (delta.reasoning_content) {
             yield { type: 'reasoning', content: delta.reasoning_content } as StreamDelta;
           }

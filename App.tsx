@@ -54,7 +54,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const engineName = engine === 'deepseek' ? 'DeepSeek R1' : 'Gemini 3 Pro';
+    const engineName = engine === 'deepseek' ? 'DeepSeek V3' : 'Gemini 3 Pro';
     setMessages([{
       role: 'assistant',
       text: `Система готова. Движок: ${engineName}. Режим: ${currentPersonality.name}.`,
@@ -151,11 +151,11 @@ const App: React.FC = () => {
       <header className="px-5 py-3 bg-[#161b22]/95 backdrop-blur-md border-b border-[#30363d] flex items-center justify-between z-50">
         <div className="flex items-center gap-3">
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-lg transition-all ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-600'}`}>
-             <span className="text-white text-lg font-black italic">{engine === 'deepseek' ? 'D' : 'G'}</span>
+             <span className="text-white text-lg font-black italic">{engine === 'deepseek' ? 'V' : 'G'}</span>
           </div>
           <div>
             <h1 className="text-xs font-black uppercase tracking-[0.2em] text-white">
-              {engine === 'deepseek' ? 'DeepSeek' : 'Gemini'} <span className={engine === 'deepseek' ? 'text-[#4D6BFE]' : 'text-cyan-400'}>{engine === 'deepseek' ? 'R1' : '3 PRO'}</span>
+              {engine === 'deepseek' ? 'DeepSeek' : 'Gemini'} <span className={engine === 'deepseek' ? 'text-[#4D6BFE]' : 'text-cyan-400'}>{engine === 'deepseek' ? 'V3' : '3 PRO'}</span>
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className={`w-1 h-1 rounded-full ${authError ? 'bg-red-500' : 'bg-green-500'} ${isTyping ? 'animate-pulse' : ''}`}></span>
@@ -171,7 +171,7 @@ const App: React.FC = () => {
             onClick={() => setEngine('deepseek')}
             className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${engine === 'deepseek' ? 'bg-[#4D6BFE] text-white' : 'text-slate-500'}`}
           >
-            DeepSeek
+            DeepSeek V3
           </button>
           <button 
             onClick={() => setEngine('gemini')}
@@ -219,7 +219,7 @@ const App: React.FC = () => {
               <div className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.4s] ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-500'}`}></div>
             </div>
             <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${engine === 'deepseek' ? 'text-[#4D6BFE]' : 'text-cyan-500'}`}>
-              Reasoning...
+              {engine === 'deepseek' ? 'Processing V3...' : 'Reasoning...'}
             </span>
           </div>
         )}
@@ -232,7 +232,7 @@ const App: React.FC = () => {
             <textarea 
               rows={1}
               className={`w-full bg-[#0d1117] border border-[#30363d] rounded-2xl px-5 py-3.5 text-sm text-white placeholder-slate-600 transition-all outline-none resize-none hide-scrollbar focus:border-${engine === 'deepseek' ? '[#4D6BFE]' : 'cyan-500'}`}
-              placeholder={engine === 'deepseek' ? "Запрос к R1..." : "Запрос к Gemini..."}
+              placeholder={engine === 'deepseek' ? "Запрос к V3..." : "Запрос к Gemini..."}
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               onKeyDown={e => {

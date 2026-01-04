@@ -14,7 +14,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
     <div className={`flex w-full mb-6 ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
       <div className={`max-w-[95%] sm:max-w-[85%] flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
         
-        {/* DeepSeek Reasoning Block */}
+        {/* DeepSeek Reasoning Block (Hidden if empty in V3) */}
         {!isUser && message.reasoning && (
           <div className="mb-3 w-full animate-fade-in">
             <button 
@@ -36,7 +36,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
               <div className="mt-2 p-4 bg-[#161b22] border-l-2 border-[#4D6BFE] text-slate-400 text-[13px] italic font-light leading-relaxed rounded-r-xl shadow-inner overflow-hidden">
                 <div className="flex items-center gap-2 mb-2 opacity-50">
                   <div className="w-1.5 h-1.5 bg-[#4D6BFE] rounded-full animate-pulse"></div>
-                  <span className="text-[10px] font-bold uppercase tracking-tighter">DeepThink Engine v3</span>
+                  <span className="text-[10px] font-bold uppercase tracking-tighter">DeepSeek V3 Core</span>
                 </div>
                 {message.reasoning}
               </div>
@@ -55,7 +55,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
           <div className="whitespace-pre-wrap">{message.text}</div>
           
           <div className={`text-[9px] mt-3 font-bold tracking-widest uppercase opacity-30 flex items-center gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
-            <span>{isUser ? 'Вы' : 'DeepSeek R1'}</span>
+            <span>{isUser ? 'Вы' : 'DeepSeek V3'}</span>
             <span>•</span>
             <span>{new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           </div>

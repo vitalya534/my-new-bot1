@@ -5,65 +5,21 @@ export interface StreamDelta {
 }
 
 export class DeepSeekService {
-  private getEnvVar(name: string): string | undefined {
-    // Явный доступ по именам помогает бандлерам (Vite/Next.js/Webpack)
-    // подставлять значения на этапе сборки.
-    const p = (typeof process !== 'undefined' ? process : { env: {} }) as any;
-    const w = (window as any).process?.env || {};
-
-    if (name === 'DEEPSEEK_API_KEY') {
-      return (
-        p.env?.DEEPSEEK_API_KEY || 
-        w.DEEPSEEK_API_KEY || 
-        p.env?.NEXT_PUBLIC_DEEPSEEK_API_KEY || 
-        w.NEXT_PUBLIC_DEEPSEEK_API_KEY ||
-        p.env?.VITE_DEEPSEEK_API_KEY ||
-        w.VITE_DEEPSEEK_API_KEY
-      )?.trim();
-    }
-
-    if (name === 'DEEPSEEK_API_URL') {
-      return (
-        p.env?.DEEPSEEK_API_URL || 
-        w.DEEPSEEK_API_URL || 
-        p.env?.NEXT_PUBLIC_DEEPSEEK_API_URL || 
-        p.env?.VITE_DEEPSEEK_API_URL
-      )?.trim();
-    }
-
-    if (name === 'API_KEY') {
-      return (
-        p.env?.API_KEY || 
-        w.API_KEY || 
-        p.env?.NEXT_PUBLIC_API_KEY || 
-        p.env?.VITE_API_KEY
-      )?.trim();
-    }
-
-    return undefined;
+  private getApiKey(): string {
+    // Согласно инструкции, используем исключительно process.env.API_KEY
+    return (process.env.API_KEY || '').trim();
   }
 
   private getApiUrl(): string {
-    return this.getEnvVar('DEEPSEEK_API_URL') || 'https://api.deepseek.com/chat/completions';
+    // Используем базовый URL для DeepSeek или прокси, если настроен
+    return 'https://api.deepseek.com/chat/completions';
   }
 
   public async *sendMessageStream(message: string, history: any[], systemInstruction: string) {
-    let apiKey = this.getEnvVar('DEEPSEEK_API_KEY');
-    
-    // Попытка использовать универсальный API_KEY, если DeepSeek-специфичный не задан
-    if (!apiKey) {
-      const genericKey = this.getEnvVar('API_KEY');
-      // Используем только если это не ключ Gemini (те начинаются с AIza)
-      if (genericKey && !genericKey.startsWith('AIza')) {
-        apiKey = genericKey;
-      }
-    }
-    
-    // Логируем только факт наличия ключа
-    console.debug(`[DeepSeek] API Key detected: ${apiKey ? 'YES (starts with ' + apiKey.substring(0,4) + ')' : 'NO'}`);
+    const apiKey = this.getApiKey();
 
     if (!apiKey) {
-      throw new Error("API ключ DeepSeek не найден. Убедитесь, что вы добавили DEEPSEEK_API_KEY в Environment Variables на Vercel и перезапустили Deployment.");
+      throw new Error("API_KEY не найден в переменных окружения.");
     }
 
     const response = await fetch(this.getApiUrl(), {
@@ -73,7 +29,7 @@ export class DeepSeekService {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "deepseek-chat",
+        model: "deepseek-reasoner", // Используем R1 (reasoner) для глубоких размышлений
         messages: [
           { role: "system", content: systemInstruction },
           ...history,
@@ -85,24 +41,11 @@ export class DeepSeekService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      let errorMessage = `HTTP ${response.status}`;
-      
-      try {
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.error?.message) {
-          errorMessage = errorJson.error.message;
-        }
-      } catch (e) {}
-      
-      if (response.status === 401) {
-        throw new Error(`Ошибка 401: Ключ (${apiKey.substring(0, 4)}...) не авторизован. Проверьте баланс на deepseek.com.`);
-      }
-      
-      throw new Error(`DeepSeek API Error: ${errorMessage}`);
+      throw new Error(`Ошибка API (${response.status}): ${errorText || response.statusText}`);
     }
 
     const reader = response.body?.getReader();
-    if (!reader) throw new Error("Не удалось прочитать поток ответа.");
+    if (!reader) throw new Error("Не удалось прочитать поток данных.");
     
     const decoder = new TextDecoder();
     let buffer = '';
@@ -127,13 +70,17 @@ export class DeepSeekService {
           const delta = data.choices?.[0]?.delta;
           if (!delta) continue;
           
+          // Обработка процесса размышления (R1)
           if (delta.reasoning_content) {
-            yield { type: 'reasoning', content: delta.reasoning_content } as StreamDelta;
+            yield { type: 'reasoning', content: delta.reasoning_content };
           }
+          // Обработка основного контента
           if (delta.content) {
-            yield { type: 'content', content: delta.content } as StreamDelta;
+            yield { type: 'content', content: delta.content };
           }
-        } catch (e) {}
+        } catch (e) {
+          // Игнорируем ошибки парсинга неполных чанков
+        }
       }
     }
   }

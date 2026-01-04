@@ -7,15 +7,14 @@ export interface StreamDelta {
 }
 
 export class GeminiService {
-  // Согласно инструкции: всегда используем новый экземпляр перед вызовом
   private getClient() {
+    // Используем строго предоставленный ключ окружения
     return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
   }
 
   public async *sendMessageStream(message: string, history: any[], systemInstruction: string) {
     const ai = this.getClient();
     
-    // Преобразование истории в формат Gemini
     const contents = [
       ...history.map(h => ({
         role: h.role === 'assistant' ? 'model' : 'user',
@@ -29,18 +28,18 @@ export class GeminiService {
       contents: contents as any,
       config: {
         systemInstruction: systemInstruction,
-        // Максимальный бюджет для глубокого рассуждения (thinking)
+        // Активируем режим рассуждения (аналог DeepSeek R1)
         thinkingConfig: { thinkingBudget: 32768 },
+        temperature: 1,
       },
     });
 
     for await (const chunk of responseStream) {
-      // Получаем текст напрямую через свойство .text согласно правилам
+      // Извлекаем текст ответа
       const text = chunk.text;
       
-      // Извлекаем мысли (thought process) из частей ответа
-      // В Gemini 3 "мысли" приходят как часть контента с полем thought
-      const thoughtPart = chunk.candidates?.[0]?.content?.parts?.find((p: any) => p.thought);
+      // Извлекаем части с размышлениями (thought)
+      const thoughtPart = chunk.candidates?.[0]?.content?.parts?.find((p: any) => 'thought' in p);
       const thought = thoughtPart ? (thoughtPart as any).thought : null;
       
       if (thought) {

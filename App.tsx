@@ -29,11 +29,10 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Начальное приветствие
   useEffect(() => {
     setMessages([{
       role: 'assistant',
-      text: `Привет! Я твой продвинутый ассистент на базе **Gemini 3 Pro**. Работаю в режиме **${currentPersonality.name}**. Чем могу помочь?`,
+      text: `Система активна. Движок: **Gemini 3 Pro** (Advanced Reasoning). Режим: **${currentPersonality.name}**. Чем могу помочь?`,
       timestamp: Date.now()
     }]);
     setError(null);
@@ -60,7 +59,7 @@ const App: React.FC = () => {
     setIsTyping(true);
 
     const history = messages
-      .filter(m => m.timestamp > 0 && !m.text.startsWith('Ошибка:')) 
+      .filter(m => m.timestamp > 0 && !m.text.includes('Ошибка')) 
       .slice(-10) 
       .map(m => ({
         role: m.role,
@@ -106,13 +105,13 @@ const App: React.FC = () => {
         });
       }
     } catch (err: any) {
-      console.error("Chat Error:", err);
-      const errorMessage = err.message || "Произошла ошибка при обращении к Gemini API.";
+      console.error("API Error:", err);
+      const errorMessage = err.message || "Ошибка соединения с сервером.";
       setError(errorMessage);
       
       setMessages(prev => [...prev, {
         role: 'assistant',
-        text: `Ошибка: ${errorMessage}`,
+        text: `**Ошибка:** ${errorMessage}. Пожалуйста, проверьте настройки подключения.`,
         timestamp: Date.now()
       }]);
       setInputText(currentInput);
@@ -126,7 +125,7 @@ const App: React.FC = () => {
       {/* Header */}
       <header className="px-5 py-4 bg-[#161b22]/95 backdrop-blur-md border-b border-[#30363d] flex items-center justify-between z-50">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.4)]">
+          <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.4)]">
              <span className="text-white text-xl font-black">G</span>
           </div>
           <div>
@@ -136,15 +135,10 @@ const App: React.FC = () => {
             <div className="flex items-center gap-1.5 mt-1.5">
               <span className={`w-2 h-2 rounded-full ${isTyping ? 'bg-indigo-400 animate-pulse' : 'bg-green-500'}`}></span>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                {isTyping ? 'Thinking Deeply...' : 'AI Assistant Active'}
+                {isTyping ? 'Анализ данных...' : 'Система готова'}
               </span>
             </div>
           </div>
-        </div>
-
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-black/20 rounded-lg border border-[#30363d]">
-          <span className="text-[10px] font-bold text-slate-500 uppercase">Status:</span>
-          <span className="text-[10px] font-bold text-indigo-400 uppercase">Ultra Performance</span>
         </div>
       </header>
 
@@ -179,7 +173,7 @@ const App: React.FC = () => {
             <textarea 
               rows={1}
               className="w-full bg-[#0d1117] border border-[#30363d] rounded-2xl px-5 py-4 text-[15px] text-white placeholder-slate-600 transition-all outline-none resize-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/10 shadow-inner"
-              placeholder="Введите сообщение..."
+              placeholder="Спросите о чем угодно..."
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               onKeyDown={e => {
@@ -201,9 +195,6 @@ const App: React.FC = () => {
             </svg>
           </button>
         </form>
-        <p className="text-[9px] text-center text-slate-600 mt-2 uppercase tracking-widest font-bold">
-          Powered by Google Gemini 3 Pro • Real-time Reasoning
-        </p>
       </footer>
     </div>
   );

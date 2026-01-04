@@ -3,27 +3,27 @@ import { Personality } from './types';
 
 export const PERSONALITIES: Personality[] = [
   {
-    id: 'gemini-gen',
-    name: 'General Assistant',
-    emoji: '🧠',
-    description: 'Универсальный помощник на базе Gemini 3 Pro.',
+    id: 'ds-gen',
+    name: 'DeepSeek V3',
+    emoji: '⚡',
+    description: 'Универсальный помощник на базе DeepSeek V3.',
+    color: 'bg-blue-600',
+    instruction: 'You are DeepSeek-V3, a helpful and efficient AI assistant. Provide concise and accurate answers.'
+  },
+  {
+    id: 'ds-r1',
+    name: 'R1 Reasoning',
+    emoji: '🧩',
+    description: 'Глубокое логическое мышление.',
     color: 'bg-indigo-600',
-    instruction: 'You are a highly capable AI assistant powered by Gemini 3 Pro. Provide clear, accurate, and insightful responses. Use your advanced reasoning capabilities to break down complex tasks.'
+    instruction: 'You are DeepSeek-R1. Focus on deep reasoning, step-by-step logic, and detailed problem solving. Always show your complex thought process.'
   },
   {
-    id: 'gemini-coder',
-    name: 'Code Architect',
+    id: 'ds-coder',
+    name: 'Code Master',
     emoji: '💻',
-    description: 'Эксперт по коду и системному дизайну.',
+    description: 'Эксперт по программированию.',
     color: 'bg-slate-800',
-    instruction: 'You are an expert Software Architect. Provide high-quality code examples, follow best practices, and explain complex technical concepts simply. Focus on performance and security.'
-  },
-  {
-    id: 'gemini-creative',
-    name: 'Creative Writer',
-    emoji: '✍️',
-    description: 'Творческое письмо и идеи.',
-    color: 'bg-purple-600',
-    instruction: 'You are a creative writing specialist. Help with storytelling, marketing copy, and creative brainstorming. Use engaging and evocative language.'
+    instruction: 'You are a Senior Software Engineer. Provide optimized code, explain architecture, and debug with precision.'
   }
 ];

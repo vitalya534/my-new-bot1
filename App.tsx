@@ -3,11 +3,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PERSONALITIES } from './constants';
 import { Message, Personality } from './types';
 import ChatMessage from './components/ChatMessage';
-import { geminiService } from './services/geminiService';
+import { deepseekService } from './services/deepseekService';
 
 declare global {
   interface Window {
     Telegram?: any;
+    process?: any;
   }
 }
 
@@ -32,7 +33,7 @@ const App: React.FC = () => {
   useEffect(() => {
     setMessages([{
       role: 'assistant',
-      text: `Система Gemini 3 Reasoning инициализирована. Режим: ${currentPersonality.name}. Я готов к глубокому анализу ваших задач.`,
+      text: `Движок DeepSeek-R1 (Reasoner) активирован. Режим: ${currentPersonality.name}. Чем я могу помочь?`,
       timestamp: Date.now()
     }]);
   }, [currentPersonality]);
@@ -65,7 +66,9 @@ const App: React.FC = () => {
       }));
 
     try {
-      const stream = geminiService.sendMessageStream(
+      if (!deepseekService) throw new Error("DeepSeek Service not initialized");
+
+      const stream = deepseekService.sendMessageStream(
         userMessage.text, 
         history, 
         currentPersonality.instruction
@@ -103,10 +106,10 @@ const App: React.FC = () => {
         });
       }
     } catch (error: any) {
-      console.error("Gemini Error:", error);
+      console.error("DeepSeek Error:", error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        text: `Ошибка: ${error.message}. Убедитесь, что API ключ корректен для Google Gemini.`,
+        text: `Ошибка API: ${error.message}. Если вы видите 'Authentication Fails', значит текущий ключ не подходит для DeepSeek.`,
         timestamp: Date.now()
       }]);
       setInputText(currentInput);
@@ -119,16 +122,16 @@ const App: React.FC = () => {
     <div className="flex flex-col h-screen w-full bg-[#0d1117] text-slate-200 font-sans">
       <header className="px-5 py-4 bg-[#161b22]/90 backdrop-blur-xl border-b border-[#30363d] flex items-center justify-between z-50">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-cyan-600 flex items-center justify-center shadow-[0_0_15px_rgba(8,145,178,0.4)]">
-             <span className="text-white text-lg font-black italic">G</span>
+          <div className="w-9 h-9 rounded-xl bg-[#4D6BFE] flex items-center justify-center shadow-[0_0_15px_rgba(77,107,254,0.4)]">
+             <span className="text-white text-lg font-black italic">D</span>
           </div>
           <div>
             <h1 className="text-xs font-black uppercase tracking-[0.2em] text-white">
-              Gemini <span className="text-cyan-400">Advanced</span>
+              DeepSeek <span className="text-[#4D6BFE]">R1</span>
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-1 h-1 bg-cyan-500 rounded-full animate-pulse"></span>
-              <span className="text-[9px] font-bold text-slate-500 uppercase">Reasoning Active</span>
+              <span className="w-1 h-1 bg-green-500 rounded-full animate-pulse"></span>
+              <span className="text-[9px] font-bold text-slate-500 uppercase">Neural Engine Active</span>
             </div>
           </div>
         </div>
@@ -141,7 +144,7 @@ const App: React.FC = () => {
             onClick={() => setCurrentPersonality(p)}
             className={`flex-shrink-0 px-4 py-2 rounded-xl transition-all border text-[10px] font-black uppercase tracking-widest ${
               currentPersonality.id === p.id 
-                ? 'bg-cyan-600 border-transparent text-white shadow-lg' 
+                ? 'bg-[#4D6BFE] border-transparent text-white shadow-lg' 
                 : 'bg-[#161b22] border-[#30363d] text-slate-500 hover:text-slate-300'
             }`}
           >
@@ -156,11 +159,11 @@ const App: React.FC = () => {
         {isTyping && !messages[messages.length-1]?.text && !messages[messages.length-1]?.reasoning && (
           <div className="flex items-center gap-3 p-4 bg-[#161b22] rounded-2xl border border-[#30363d] w-fit animate-pulse">
             <div className="flex gap-1">
-              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce"></div>
-              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+              <div className="w-1.5 h-1.5 bg-[#4D6BFE] rounded-full animate-bounce"></div>
+              <div className="w-1.5 h-1.5 bg-[#4D6BFE] rounded-full animate-bounce [animation-delay:0.2s]"></div>
+              <div className="w-1.5 h-1.5 bg-[#4D6BFE] rounded-full animate-bounce [animation-delay:0.4s]"></div>
             </div>
-            <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.2em]">Thinking...</span>
+            <span className="text-[10px] font-black text-[#4D6BFE] uppercase tracking-[0.2em]">DeepThink R1...</span>
           </div>
         )}
         <div ref={chatEndRef} />
@@ -170,8 +173,8 @@ const App: React.FC = () => {
         <form onSubmit={handleSendMessage} className="flex gap-2 max-w-4xl mx-auto">
           <input 
             type="text"
-            className="flex-1 bg-[#0d1117] border border-[#30363d] rounded-2xl px-5 py-4 text-sm text-white placeholder-slate-600 focus:border-cyan-500 transition-all outline-none"
-            placeholder="Спросите о чем угодно..."
+            className="flex-1 bg-[#0d1117] border border-[#30363d] rounded-2xl px-5 py-4 text-sm text-white placeholder-slate-600 focus:border-[#4D6BFE] transition-all outline-none"
+            placeholder="Запрос к DeepSeek R1..."
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             disabled={isTyping}
@@ -179,7 +182,7 @@ const App: React.FC = () => {
           <button 
             type="submit"
             disabled={!inputText.trim() || isTyping}
-            className="w-14 h-14 rounded-2xl bg-cyan-600 text-white flex items-center justify-center disabled:opacity-20 transition-all active:scale-90 shadow-xl"
+            className="w-14 h-14 rounded-2xl bg-[#4D6BFE] text-white flex items-center justify-center disabled:opacity-20 transition-all active:scale-90 shadow-xl shadow-blue-900/20"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>

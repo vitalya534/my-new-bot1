@@ -5,7 +5,16 @@ export interface StreamDelta {
 }
 
 export class DeepSeekService {
-  private apiUrl = 'https://api.deepseek.com/chat/completions';
+  // Динамический URL с поддержкой кастомных эндпоинтов
+  private getApiUrl(): string {
+    const customUrl = (
+      (typeof process !== 'undefined' && process.env?.DEEPSEEK_API_URL) || 
+      (window as any).process?.env?.DEEPSEEK_API_URL ||
+      (import.meta as any).env?.VITE_DEEPSEEK_API_URL
+    )?.trim();
+
+    return customUrl || 'https://api.deepseek.com/chat/completions';
+  }
 
   public async *sendMessageStream(message: string, history: any[], systemInstruction: string) {
     const apiKey = (
@@ -17,14 +26,14 @@ export class DeepSeekService {
     )?.trim();
     
     if (!apiKey) {
-      throw new Error("API_KEY не обнаружен. Проверьте настройки Environment Variables.");
+      throw new Error("API_KEY или DEEPSEEK_API_KEY не обнаружен в настройках.");
     }
 
     if (apiKey.startsWith('AIza')) {
-      throw new Error("Вы пытаетесь использовать ключ Google Gemini для DeepSeek. Это разные сервисы. Пожалуйста, переключитесь на движок Gemini в заголовке или добавьте ключ от DeepSeek.");
+      throw new Error("Обнаружен ключ Gemini. Для DeepSeek нужен ключ 'sk-...'. Переключите движок вверху.");
     }
 
-    const response = await fetch(this.apiUrl, {
+    const response = await fetch(this.getApiUrl(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -52,14 +61,14 @@ export class DeepSeekService {
       } catch (e) {}
       
       if (response.status === 401) {
-        throw new Error(`Ошибка авторизации (401): Ключ не принят DeepSeek. Убедитесь, что ваш ключ корректен и баланс пополнен на api.deepseek.com.`);
+        throw new Error(`401 Unauthorized: Проверьте ключ и баланс на платформе DeepSeek.`);
       }
       
-      throw new Error(`DeepSeek API Error: ${errorMessage}`);
+      throw new Error(`DeepSeek Error: ${errorMessage}`);
     }
 
     const reader = response.body?.getReader();
-    if (!reader) throw new Error("Не удалось прочитать поток ответа.");
+    if (!reader) throw new Error("Поток данных недоступен.");
     
     const decoder = new TextDecoder();
     let buffer = '';

@@ -5,32 +5,28 @@ export interface StreamDelta {
 }
 
 export class DeepSeekService {
-  // Динамический URL с поддержкой кастомных эндпоинтов
   private getApiUrl(): string {
-    const customUrl = (
-      (typeof process !== 'undefined' && process.env?.DEEPSEEK_API_URL) || 
-      (window as any).process?.env?.DEEPSEEK_API_URL ||
-      (import.meta as any).env?.VITE_DEEPSEEK_API_URL
-    )?.trim();
-
+    const env = (window as any).process?.env || {};
+    const customUrl = (process.env?.DEEPSEEK_API_URL || env.DEEPSEEK_API_URL)?.trim();
     return customUrl || 'https://api.deepseek.com/chat/completions';
   }
 
   public async *sendMessageStream(message: string, history: any[], systemInstruction: string) {
-    const apiKey = (
-      (typeof process !== 'undefined' && (process.env?.DEEPSEEK_API_KEY || process.env?.API_KEY)) || 
-      (window as any).process?.env?.DEEPSEEK_API_KEY || 
-      (window as any).process?.env?.API_KEY ||
-      (import.meta as any).env?.VITE_DEEPSEEK_API_KEY ||
-      (import.meta as any).env?.VITE_API_KEY
-    )?.trim();
+    const env = (window as any).process?.env || {};
+    
+    // Приоритетное использование специализированной переменной DEEPSEEK_API_KEY
+    let apiKey = (process.env?.DEEPSEEK_API_KEY || env.DEEPSEEK_API_KEY)?.trim();
     
     if (!apiKey) {
-      throw new Error("API_KEY или DEEPSEEK_API_KEY не обнаружен в настройках.");
+      const genericKey = (process.env?.API_KEY || env.API_KEY)?.trim();
+      // Проверка, чтобы не использовать ключ Gemini для запросов к DeepSeek
+      if (genericKey && !genericKey.startsWith('AIza')) {
+        apiKey = genericKey;
+      }
     }
-
-    if (apiKey.startsWith('AIza')) {
-      throw new Error("Обнаружен ключ Gemini. Для DeepSeek нужен ключ 'sk-...'. Переключите движок вверху.");
+    
+    if (!apiKey) {
+      throw new Error("Ключ DEEPSEEK_API_KEY не обнаружен. Проверьте настройки окружения.");
     }
 
     const response = await fetch(this.getApiUrl(), {
@@ -53,6 +49,7 @@ export class DeepSeekService {
     if (!response.ok) {
       const errorText = await response.text();
       let errorMessage = `HTTP ${response.status}`;
+      
       try {
         const errorJson = JSON.parse(errorText);
         if (errorJson.error?.message) {
@@ -61,14 +58,14 @@ export class DeepSeekService {
       } catch (e) {}
       
       if (response.status === 401) {
-        throw new Error(`401 Unauthorized: Проверьте ключ и баланс на платформе DeepSeek.`);
+        throw new Error("Ошибка 401: DEEPSEEK_API_KEY невалиден или баланс на платформе DeepSeek пуст.");
       }
       
-      throw new Error(`DeepSeek Error: ${errorMessage}`);
+      throw new Error(`DeepSeek API Error: ${errorMessage}`);
     }
 
     const reader = response.body?.getReader();
-    if (!reader) throw new Error("Поток данных недоступен.");
+    if (!reader) throw new Error("Не удалось прочитать поток ответа.");
     
     const decoder = new TextDecoder();
     let buffer = '';

@@ -22,29 +22,29 @@ const App: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [engine, setEngine] = useState<EngineType>('deepseek');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [botAuth, setBotAuth] = useState(false);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Логирование конфигурации для диагностики
     const env = (window as any).process?.env || {};
-    const hasKey = !!(env.API_KEY || env.DEEPSEEK_API_KEY);
-    const hasUrl = !!env.DEEPSEEK_API_URL;
-    const hasBotToken = !!env.BOT_TOKEN;
+    const dsKey = (process.env?.DEEPSEEK_API_KEY || env.DEEPSEEK_API_KEY)?.trim();
+    const gKey = (process.env?.API_KEY || env.API_KEY)?.trim();
+    const botToken = (process.env?.BOT_TOKEN || env.BOT_TOKEN)?.trim();
 
-    console.log("System Check:", { 
-      engine_key: hasKey ? "DETECTED" : "MISSING", 
-      custom_url: hasUrl ? "ACTIVE" : "DEFAULT",
-      bot_auth: hasBotToken ? "CONFIGURED" : "N/A"
-    });
-
-    const key = (env.API_KEY || env.DEEPSEEK_API_KEY)?.trim();
-    if (key && key.startsWith('AIza')) {
-      setEngine('gemini');
+    // Проверка наличия BOT_TOKEN для Telegram интеграции
+    if (botToken) {
+      setBotAuth(true);
+      console.log("BOT_TOKEN detected. Telegram integration active.");
     }
-  }, []);
 
-  useEffect(() => {
+    // Автоматический выбор движка на основе форматов ключей
+    if (gKey?.startsWith('AIza') && (!dsKey || dsKey.startsWith('AIza'))) {
+      setEngine('gemini');
+    } else {
+      setEngine('deepseek');
+    }
+
     if (window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
       tg.ready();
@@ -54,9 +54,10 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const engineName = engine === 'deepseek' ? 'DeepSeek R1' : 'Gemini 3 Pro';
     setMessages([{
       role: 'assistant',
-      text: `Система готова. Движок: ${engine === 'deepseek' ? 'DeepSeek R1' : 'Gemini 3 Pro'}. Режим: ${currentPersonality.name}. Чем я могу помочь?`,
+      text: `Система готова. Движок: ${engineName}. Режим: ${currentPersonality.name}.`,
       timestamp: Date.now()
     }]);
     setAuthError(null);
@@ -131,10 +132,12 @@ const App: React.FC = () => {
       }
     } catch (error: any) {
       console.error("Engine Error:", error);
-      setAuthError(error.message);
+      const msg = error.message || "Unknown error";
+      setAuthError(msg);
+      
       setMessages(prev => [...prev, {
         role: 'assistant',
-        text: `Ошибка: ${error.message}`,
+        text: `Ошибка выполнения: ${msg}`,
         timestamp: Date.now()
       }]);
       setInputText(currentInput);
@@ -155,8 +158,10 @@ const App: React.FC = () => {
               {engine === 'deepseek' ? 'DeepSeek' : 'Gemini'} <span className={engine === 'deepseek' ? 'text-[#4D6BFE]' : 'text-cyan-400'}>{engine === 'deepseek' ? 'R1' : '3 PRO'}</span>
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={`w-1 h-1 rounded-full animate-pulse ${authError ? 'bg-red-500' : 'bg-green-500'}`}></span>
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{authError ? 'Error' : 'Ready'}</span>
+              <span className={`w-1 h-1 rounded-full ${authError ? 'bg-red-500' : 'bg-green-500'} ${isTyping ? 'animate-pulse' : ''}`}></span>
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                {authError ? 'Error' : botAuth ? 'Bot Linked' : 'Online'}
+              </span>
             </div>
           </div>
         </div>
@@ -166,7 +171,7 @@ const App: React.FC = () => {
             onClick={() => setEngine('deepseek')}
             className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${engine === 'deepseek' ? 'bg-[#4D6BFE] text-white' : 'text-slate-500'}`}
           >
-            DS R1
+            DeepSeek
           </button>
           <button 
             onClick={() => setEngine('gemini')}
@@ -178,9 +183,11 @@ const App: React.FC = () => {
       </header>
 
       {authError && (
-        <div className="bg-red-900/10 border-b border-red-500/30 p-2 text-center">
-          <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider">
-            {authError.includes('401') ? '⚠️ Проблема с ключом или балансом' : `⚠️ ${authError}`}
+        <div className="bg-red-900/20 border-b border-red-500/40 p-3 text-center animate-fade-in flex flex-col items-center gap-2">
+          <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider leading-tight">
+            {authError.includes('401') 
+              ? '⚠️ DEEPSEEK_API_KEY не авторизован или баланс пуст.' 
+              : `⚠️ ${authError}`}
           </p>
         </div>
       )}
@@ -212,7 +219,7 @@ const App: React.FC = () => {
               <div className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.4s] ${engine === 'deepseek' ? 'bg-[#4D6BFE]' : 'bg-cyan-500'}`}></div>
             </div>
             <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${engine === 'deepseek' ? 'text-[#4D6BFE]' : 'text-cyan-500'}`}>
-              Thinking...
+              Reasoning...
             </span>
           </div>
         )}
@@ -225,7 +232,7 @@ const App: React.FC = () => {
             <textarea 
               rows={1}
               className={`w-full bg-[#0d1117] border border-[#30363d] rounded-2xl px-5 py-3.5 text-sm text-white placeholder-slate-600 transition-all outline-none resize-none hide-scrollbar focus:border-${engine === 'deepseek' ? '[#4D6BFE]' : 'cyan-500'}`}
-              placeholder="Спросите что-нибудь..."
+              placeholder={engine === 'deepseek' ? "Запрос к R1..." : "Запрос к Gemini..."}
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               onKeyDown={e => {

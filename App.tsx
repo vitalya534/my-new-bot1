@@ -26,20 +26,29 @@ const App: React.FC = () => {
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const getEnvVar = (name: string): string | undefined => {
     const env = (window as any).process?.env || {};
-    const dsKey = (process.env?.DEEPSEEK_API_KEY || env.DEEPSEEK_API_KEY)?.trim();
-    const gKey = (process.env?.API_KEY || env.API_KEY)?.trim();
-    const botToken = (process.env?.BOT_TOKEN || env.BOT_TOKEN)?.trim();
+    return (
+      (process.env?.[name]) || 
+      (env[name]) || 
+      (process.env?.[`NEXT_PUBLIC_${name}`]) || 
+      (env[`NEXT_PUBLIC_${name}`]) ||
+      (process.env?.[`VITE_${name}`]) || 
+      (env[`VITE_${name}`])
+    )?.trim();
+  };
 
-    // Проверка наличия BOT_TOKEN для Telegram интеграции
+  useEffect(() => {
+    const dsKey = getEnvVar('DEEPSEEK_API_KEY');
+    const gKey = getEnvVar('API_KEY');
+    const botToken = getEnvVar('BOT_TOKEN');
+
     if (botToken) {
       setBotAuth(true);
-      console.log("BOT_TOKEN detected. Telegram integration active.");
     }
 
-    // Автоматический выбор движка на основе форматов ключей
-    if (gKey?.startsWith('AIza') && (!dsKey || dsKey.startsWith('AIza'))) {
+    // Приоритет Gemini, если ключ похож на Gemini и нет ключа DeepSeek
+    if (gKey?.startsWith('AIza') && !dsKey) {
       setEngine('gemini');
     } else {
       setEngine('deepseek');
@@ -186,7 +195,7 @@ const App: React.FC = () => {
         <div className="bg-red-900/20 border-b border-red-500/40 p-3 text-center animate-fade-in flex flex-col items-center gap-2">
           <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider leading-tight">
             {authError.includes('401') 
-              ? '⚠️ DEEPSEEK_API_KEY не авторизован или баланс пуст.' 
+              ? '⚠️ API ключ не принят сервером. Проверьте баланс DeepSeek и корректность переменной DEEPSEEK_API_KEY в Vercel.' 
               : `⚠️ ${authError}`}
           </p>
         </div>

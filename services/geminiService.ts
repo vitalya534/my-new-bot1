@@ -9,10 +9,22 @@ export interface StreamDelta {
 export class GeminiService {
   private ai: GoogleGenAI | null = null;
 
+  private getEnvVar(name: string): string | undefined {
+    const env = (window as any).process?.env || {};
+    return (
+      (process.env?.[name]) || 
+      (env[name]) || 
+      (process.env?.[`NEXT_PUBLIC_${name}`]) || 
+      (env[`NEXT_PUBLIC_${name}`]) ||
+      (process.env?.[`VITE_${name}`]) || 
+      (env[`VITE_${name}`])
+    )?.trim();
+  }
+
   private getClient() {
     if (!this.ai) {
-      // In this context, process.env.API_KEY is the preferred source
-      const key = (process.env.API_KEY || (window as any).process?.env?.API_KEY)?.trim();
+      const key = this.getEnvVar('API_KEY');
+      console.debug(`[Gemini] Using key: ${key ? key.substring(0, 6) + '...' : 'NOT FOUND'}`);
       this.ai = new GoogleGenAI({ apiKey: key || '' });
     }
     return this.ai;
@@ -29,19 +41,17 @@ export class GeminiService {
       { role: 'user', parts: [{ text: message }] }
     ];
 
-    // Using gemini-3-pro-preview as the primary competitor to DeepSeek R1 for reasoning tasks
     const responseStream = await ai.models.generateContentStream({
       model: 'gemini-3-pro-preview',
       contents: contents as any,
       config: {
         systemInstruction: systemInstruction,
-        thinkingConfig: { thinkingBudget: 32768 }, // Maximum budget for gemini-3-pro-preview
+        thinkingConfig: { thinkingBudget: 32768 },
         temperature: 1,
       },
     });
 
     for await (const chunk of responseStream) {
-      // Handle the response parts manually to separate thinking from final output
       const parts = chunk.candidates?.[0]?.content?.parts || [];
       for (const part of parts) {
         if ((part as any).thought) {
